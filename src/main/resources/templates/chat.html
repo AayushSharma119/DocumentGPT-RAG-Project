@@ -1,31 +1,125 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
-  <head>
-    <meta charset="utf-8">
-    <title>DocumentGPT with Spring AI</title>
-    <link rel="stylesheet" href="css/style.css">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Google Fonts Link For Icons -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-    <script src="/js/documentgpt.js" defer></script>
-  </head>
-  <body>
+<head>
+  <meta charset="utf-8">
+  <title>DocumentGPT with Spring AI</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"/>
+  <!-- Markdown + Sanitization -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <script src="/js/documentgpt.js" defer></script>
+  <script>
+    // Apply saved theme before render (prevents flash)
+    (function () {
+      if (localStorage.getItem("theme") === "light") document.documentElement.classList.add("light-mode");
+    })();
+  </script>
+</head>
+<body>
 
-	 </div>
-    <!-- Chats container -->
-    <div class="chat-container"></div>
-    
-    <!-- Typing container -->
-    <div class="typing-container">
-      <div class="typing-content">
-        <div class="typing-textarea">
-          <textarea id="chat-input" spellcheck="false" placeholder="Enter a prompt here" required></textarea>
-          <span id="send-btn" class="material-symbols-rounded">send</span>
-        </div>
-        <div class="typing-controls">
-          <span id="delete-btn" class="material-symbols-rounded">delete</span>
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- App Wrapper -->
+  <div class="app-wrapper" id="app-wrapper">
+
+    <!-- ── Sidebar ──────────────────────────────────────────────────────── -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <span class="material-symbols-rounded sidebar-logo-icon">smart_toy</span>
+        <span class="sidebar-title">DocumentGPT</span>
+        <button class="icon-btn sidebar-collapse-btn" id="sidebar-collapse-btn" title="Collapse sidebar">
+          <span class="material-symbols-rounded">chevron_left</span>
+        </button>
       </div>
-    </div>
 
-  </body>
+      <div class="sidebar-section-label">Active Document</div>
+
+      <!-- Document Card (empty state) -->
+      <div class="doc-card" id="doc-card-empty">
+        <span class="material-symbols-rounded doc-card-icon muted">upload_file</span>
+        <p class="doc-card-empty-text">No document loaded</p>
+        <a href="/" class="btn-upload-new">
+          <span class="material-symbols-rounded">add</span> Upload Document
+        </a>
+      </div>
+
+      <!-- Document Card (loaded state) -->
+      <div class="doc-card doc-card-loaded" id="doc-card-loaded" style="display:none;">
+        <span class="material-symbols-rounded doc-card-icon pdf-red">picture_as_pdf</span>
+        <p class="doc-name" id="doc-name">—</p>
+        <div class="doc-meta-row">
+          <span class="material-symbols-rounded" style="font-size:0.85rem">data_usage</span>
+          <span id="doc-size" class="doc-meta-val">—</span>
+        </div>
+        <div class="doc-meta-row">
+          <span class="material-symbols-rounded" style="font-size:0.85rem">schedule</span>
+          <span id="doc-upload-time" class="doc-meta-val">—</span>
+        </div>
+        <a href="/" class="btn-upload-new" style="margin-top:12px;">
+          <span class="material-symbols-rounded">swap_horiz</span> Replace Document
+        </a>
+      </div>
+
+      <div class="sidebar-footer">
+        <span class="sidebar-badge">Spring AI</span>
+        <span class="sidebar-badge">pgvector</span>
+      </div>
+    </aside>
+
+    <!-- ── Main Content ──────────────────────────────────────────────────── -->
+    <div class="main-content">
+
+      <!-- Header -->
+      <header class="chat-header">
+        <div class="header-left">
+          <button class="icon-btn" id="sidebar-toggle-mobile" title="Toggle sidebar">
+            <span class="material-symbols-rounded">menu</span>
+          </button>
+          <button class="icon-btn sidebar-collapse-btn-header" id="sidebar-toggle-desktop" title="Toggle sidebar">
+            <span class="material-symbols-rounded">menu</span>
+          </button>
+          <div class="header-brand">
+            <img src="/images/spring-ai-logo.png" alt="Logo" class="header-logo">
+            <span class="header-brand-name">DocumentGPT</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="icon-btn" id="theme-toggle" title="Toggle theme">
+            <span class="material-symbols-rounded">light_mode</span>
+          </button>
+          <button class="icon-btn danger-hover" id="delete-btn" title="Clear chat history">
+            <span class="material-symbols-rounded">delete_outline</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Chat Messages -->
+      <div class="chat-container" id="chat-container"></div>
+
+      <!-- Scroll to Bottom -->
+      <button class="scroll-bottom-btn hidden" id="scroll-bottom-btn" title="Scroll to bottom">
+        <span class="material-symbols-rounded">expand_more</span>
+      </button>
+
+      <!-- Input Area -->
+      <div class="typing-container">
+        <div class="typing-content">
+          <div class="typing-textarea">
+            <textarea id="chat-input" spellcheck="false"
+              placeholder="Ask a question about your document…" required></textarea>
+            <button class="send-btn" id="send-btn" title="Send">
+              <span class="material-symbols-rounded">send</span>
+            </button>
+          </div>
+          <p class="input-hint">Press <kbd>Enter</kbd> to send &nbsp;·&nbsp; <kbd>Shift+Enter</kbd> for newline</p>
+        </div>
+      </div>
+
+    </div><!-- /main-content -->
+  </div><!-- /app-wrapper -->
+
+</body>
 </html>

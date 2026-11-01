@@ -4,9 +4,6 @@
 ## DocumentGPT Spring AI
 
 **DocumentGPT** is a Spring AI-powered Retrieval-Augmented Generation (RAG) application that allows users to upload documents and query information using vector search. It supports PostgreSQL with pgvector for vector storage and can use **Ollama** or **OpenAI** for embeddings and model queries.
-
-This project is based on the original repository: [salmar/documentgpt-spring-ai](https://github.com/salmar/documentgpt-spring-ai) with modifications and enhancements to support multiple AI providers and streamlined configurations.
-
 ---
 
 ### Prerequisites

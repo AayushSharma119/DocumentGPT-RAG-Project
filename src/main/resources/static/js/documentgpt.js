@@ -1,135 +1,384 @@
-const chatInput = document.querySelector("#chat-input");
-const sendButton = document.querySelector("#send-btn");
-const chatContainer = document.querySelector(".chat-container");
-const deleteButton = document.querySelector("#delete-btn");
+/* ============================================================
+   DocumentGPT — Chat Frontend
+   All 10 improvements implemented:
+   1. Streaming responses          6. Glassmorphism (CSS)
+   2. Markdown + DOMPurify (XSS)  7. Toast notifications
+   3. Timestamps                  8. Light/Dark mode
+   4. Document sidebar            9. Mobile improvements (CSS)
+   5. Drag & drop (index.html)   10. Upload progress (index.html)
+   ============================================================ */
 
-let userText = null;
+// ── Marked.js Configuration ──────────────────────────────────────────────
+if (typeof marked !== "undefined") {
+  marked.setOptions({
+    breaks: true,
+    gfm: true
+  });
+}
 
-const url = new URL("/ws-chat", location.href);
-const ws = new WebSocket(url);
-	
-ws.onmessage = function(event) {
-	const pElement = document.createElement("p");
-	pElement.textContent = event.data;
-	appendParagraph(pElement);
+// ── DOM References ────────────────────────────────────────────────────────
+const chatInput         = document.getElementById("chat-input");
+const sendBtn           = document.getElementById("send-btn");
+const chatContainer     = document.getElementById("chat-container");
+const deleteBtn         = document.getElementById("delete-btn");
+const themeToggle       = document.getElementById("theme-toggle");
+const scrollBottomBtn   = document.getElementById("scroll-bottom-btn");
+const sidebar           = document.getElementById("sidebar");
+const appWrapper        = document.getElementById("app-wrapper");
+const sidebarToggleMob  = document.getElementById("sidebar-toggle-mobile");
+const sidebarCollapseBtn = document.getElementById("sidebar-collapse-btn");
+const sidebarToggleDesk = document.getElementById("sidebar-toggle-desktop");
+const toastContainer    = document.getElementById("toast-container");
 
+// ── State ─────────────────────────────────────────────────────────────────
+let userText          = null;
+let isStreaming       = false;
+let streamBuffer      = "";
+let initialInputHeight = 55;
+
+// ── WebSocket Setup ───────────────────────────────────────────────────────
+const wsUrl      = new URL("/ws-chat", location.href);
+wsUrl.protocol   = wsUrl.protocol.replace("http", "ws");
+const ws         = new WebSocket(wsUrl.toString());
+
+ws.onopen = () => showToast("Connected to DocumentGPT", "success");
+ws.onclose = () => showToast("Connection closed. Please refresh.", "warning");
+ws.onerror = () => showToast("WebSocket error. Please refresh.", "error");
+
+ws.onmessage = function (event) {
+  const data = event.data;
+
+  if (data === "[DONE]") {
+    finalizeStream();
+    return;
+  }
+
+  if (data.startsWith("[ERROR]:")) {
+    const msg = data.slice(8) || "An error occurred.";
+    insertErrorIntoStream(msg);
+    finalizeStream();
+    return;
+  }
+
+  // Accumulate token
+  streamBuffer += data;
+  updateStreamBubble(streamBuffer);
 };
 
-const appendParagraph = (paragraph) => {
-	// Remove the typing animation, append the paragraph element and save the chats to local storage
-	const incomingChatDiv = document.querySelector("#current-response");
-	incomingChatDiv.querySelector(".typing-animation").remove();
-	incomingChatDiv.querySelector(".chat-details").appendChild(paragraph);
-	localStorage.setItem("all-chats", chatContainer.innerHTML);
-	chatContainer.scrollTo(0, chatContainer.scrollHeight);
-	incomingChatDiv.removeAttribute('id');
+// ── Streaming Helpers ─────────────────────────────────────────────────────
+function updateStreamBubble(text) {
+  const bubble = document.getElementById("current-response");
+  if (!bubble) return;
+
+  // Remove typing animation once first token arrives
+  bubble.querySelector(".typing-animation")?.remove();
+
+  let contentEl = bubble.querySelector(".ai-message-content");
+  if (!contentEl) {
+    contentEl = document.createElement("div");
+    contentEl.className = "ai-message-content";
+    bubble.querySelector(".message-wrapper").prepend(contentEl);
+  }
+
+  contentEl.innerHTML = renderMarkdown(text);
 }
 
-const loadDataFromLocalstorage = () => {
-    const defaultText = `<div class="default-text">
-                            <h1>DocumentGPT with Spring AI</h1>
-                            <p>Start a conversation with the uploaded document.<br> Your chat history will be displayed here.</p>
-                        </div>`
-
-    chatContainer.innerHTML = localStorage.getItem("all-chats") || defaultText;
-    chatContainer.scrollTo(0, chatContainer.scrollHeight); // Scroll to bottom of the chat container
+function insertErrorIntoStream(msg) {
+  const bubble = document.getElementById("current-response");
+  if (!bubble) return;
+  bubble.querySelector(".typing-animation")?.remove();
+  let contentEl = bubble.querySelector(".ai-message-content");
+  if (!contentEl) {
+    contentEl = document.createElement("div");
+    contentEl.className = "ai-message-content";
+    bubble.querySelector(".message-wrapper").prepend(contentEl);
+  }
+  const errP = document.createElement("p");
+  errP.className = "error";
+  errP.textContent = msg;
+  contentEl.appendChild(errP);
 }
 
-const createChatElement = (content, className) => {
-    // Create new div and apply chat, specified class and set html content of div
-    const chatDiv = document.createElement("div");
-    chatDiv.classList.add("chat", className);
-    chatDiv.innerHTML = content;
-    return chatDiv; // Return the created chat div
-}
-
-const getChatResponse = async (incomingChatDiv) => {
-
-     try {
-        ws.send(userText);
-    } catch (error) { // Add error class to the paragraph element and set error text
-		const pElement = document.createElement("p");
-        pElement.classList.add("error");
-        pElement.textContent = "Something went wrong while retrieving the response. Please try again!...";
-		appendParagraph(pElement);
+function finalizeStream() {
+  const bubble = document.getElementById("current-response");
+  if (bubble) {
+    // Final markdown render
+    const contentEl = bubble.querySelector(".ai-message-content");
+    if (contentEl && streamBuffer) {
+      contentEl.innerHTML = renderMarkdown(streamBuffer);
     }
+    bubble.removeAttribute("id");
+  }
+  isStreaming  = false;
+  streamBuffer = "";
+  saveChatToStorage();
+  scrollToBottom("smooth");
+  checkScrollBtn();
 }
 
-const initialInputHeight = chatInput.scrollHeight;
+function renderMarkdown(text) {
+  if (typeof marked !== "undefined" && typeof DOMPurify !== "undefined") {
+    return DOMPurify.sanitize(marked.parse(text));
+  }
+  // Fallback: plain text
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
 
-chatInput.addEventListener("input", () => {   
-    // Adjust the height of the input field dynamically based on its content
-    chatInput.style.height =  `${initialInputHeight}px`;
-    chatInput.style.height = `${chatInput.scrollHeight}px`;
-});
+// ── Toast System ──────────────────────────────────────────────────────────
+function showToast(message, type = "info") {
+  if (!toastContainer) return;
+  const icons = { success: "check_circle", error: "error", warning: "warning", info: "info" };
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `<span class="material-symbols-rounded toast-icon">${icons[type] || "info"}</span><span>${message}</span>`;
+  toastContainer.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("show"));
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 350);
+  }, 3800);
+}
 
-chatInput.addEventListener("keydown", (e) => {
-    // If the Enter key is pressed without Shift and the window width is larger 
-    // than 800 pixels, handle the outgoing chat
-    if (e.key === "Enter" && !e.shiftKey && window.innerWidth > 800) {
-        e.preventDefault();
-        handleOutgoingChat();
-    }
-});
+// ── Theme ─────────────────────────────────────────────────────────────────
+function initTheme() {
+  if (localStorage.getItem("theme") === "light") document.body.classList.add("light-mode");
+  syncThemeIcon();
+}
 
-deleteButton.addEventListener("click", () => {
-    // Remove the chats from local storage and call loadDataFromLocalstorage function
-    if(confirm("Are you sure you want to delete all the chats?")) {
-        localStorage.removeItem("all-chats");
-        loadDataFromLocalstorage();
-    }
-});
+function toggleTheme() {
+  document.body.classList.toggle("light-mode");
+  localStorage.setItem("theme", document.body.classList.contains("light-mode") ? "light" : "dark");
+  syncThemeIcon();
+}
 
-const handleOutgoingChat = () => {
-    userText = chatInput.value.trim(); // Get chatInput value and remove extra spaces
-    if(!userText) return; // If chatInput is empty return from here
+function syncThemeIcon() {
+  if (!themeToggle) return;
+  themeToggle.querySelector(".material-symbols-rounded").textContent =
+    document.body.classList.contains("light-mode") ? "dark_mode" : "light_mode";
+}
 
-    // Clear the input field and reset its height
-    chatInput.value = "";
+// ── Sidebar ───────────────────────────────────────────────────────────────
+function initSidebar() {
+  const info = JSON.parse(sessionStorage.getItem("documentInfo") || "null");
+  const emptyCard  = document.getElementById("doc-card-empty");
+  const loadedCard = document.getElementById("doc-card-loaded");
+
+  if (info && loadedCard) {
+    if (emptyCard)  emptyCard.style.display  = "none";
+    loadedCard.style.display = "flex";
+    const docNameEl = document.getElementById("doc-name");
+    const docSizeEl = document.getElementById("doc-size");
+    const docTimeEl = document.getElementById("doc-upload-time");
+    if (docNameEl) docNameEl.textContent = info.filename     || "document.pdf";
+    if (docSizeEl) docSizeEl.textContent = info.size ? formatBytes(parseInt(info.size)) : "—";
+    if (docTimeEl) docTimeEl.textContent = info.uploadTime   || "—";
+  }
+}
+
+function formatBytes(b) {
+  if (b < 1024) return b + " B";
+  if (b < 1048576) return (b / 1024).toFixed(1) + " KB";
+  return (b / 1048576).toFixed(1) + " MB";
+}
+
+function toggleSidebarCollapse() {
+  sidebar?.classList.toggle("collapsed");
+}
+
+function toggleSidebarMobile() {
+  appWrapper?.classList.toggle("sidebar-open");
+}
+
+// ── Chat Persistence ──────────────────────────────────────────────────────
+function saveChatToStorage() {
+  if (chatContainer) localStorage.setItem("all-chats", chatContainer.innerHTML);
+}
+
+function loadChatFromStorage() {
+  const defaultHTML = `
+    <div class="default-text">
+      <span class="material-symbols-rounded default-icon">forum</span>
+      <h1>DocumentGPT</h1>
+      <p>Upload a document and start asking questions.<br>Your conversation will appear here.</p>
+    </div>`;
+  if (chatContainer) {
+    chatContainer.innerHTML = localStorage.getItem("all-chats") || defaultHTML;
+    scrollToBottom("instant");
+    checkScrollBtn();
+  }
+}
+
+// ── Timestamp ─────────────────────────────────────────────────────────────
+function getTimestamp() {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+// ── Outgoing Message ──────────────────────────────────────────────────────
+function handleOutgoingChat() {
+  if (isStreaming) {
+    showToast("Please wait for the current response to finish.", "warning");
+    return;
+  }
+  const text = chatInput?.value.trim();
+  if (!text) return;
+
+  if (ws.readyState !== WebSocket.OPEN) {
+    showToast("Not connected. Please refresh the page.", "error");
+    return;
+  }
+
+  userText = text;
+  chatInput.value = "";
+  if (chatInput) {
     chatInput.style.height = `${initialInputHeight}px`;
+  }
 
-    const html = `<div class="chat-content">
-                    <div class="chat-details">
-                        <img src="/images/person.png" alt="user-img">
-                        <p>${userText}</p>
-                    </div>
-                </div>`;
+  // Build outgoing bubble safely (no innerHTML with user content → no XSS)
+  const msgWrap   = document.createElement("div");
+  msgWrap.className = "message-wrapper";
 
-    // Create an outgoing chat div with user's message and append it to chat container
-    const outgoingChatDiv = createChatElement(html, "outgoing");
-    chatContainer.querySelector(".default-text")?.remove();
-    chatContainer.appendChild(outgoingChatDiv);
-    chatContainer.scrollTo(0, chatContainer.scrollHeight);
-    setTimeout(showTypingAnimation, 500);
+  const textP     = document.createElement("p");
+  textP.textContent = userText;           // ✅ textContent is XSS-safe
+
+  const tsSpan    = document.createElement("span");
+  tsSpan.className = "timestamp";
+  tsSpan.textContent = getTimestamp();
+
+  msgWrap.appendChild(textP);
+  msgWrap.appendChild(tsSpan);
+
+  const details   = document.createElement("div");
+  details.className = "chat-details";
+  const img       = document.createElement("img");
+  img.src = "/images/person.png";
+  img.alt = "You";
+  details.appendChild(img);
+  details.appendChild(msgWrap);
+
+  const content   = document.createElement("div");
+  content.className = "chat-content";
+  content.appendChild(details);
+
+  const chatDiv   = document.createElement("div");
+  chatDiv.className = "chat outgoing";
+  chatDiv.appendChild(content);
+
+  chatContainer?.querySelector(".default-text")?.remove();
+  chatContainer?.appendChild(chatDiv);
+  scrollToBottom("smooth");
+
+  isStreaming  = true;
+  streamBuffer = "";
+  setTimeout(showTypingAnimation, 400);
 }
 
-const showTypingAnimation = () => {
-    // Display the typing animation and call the getChatResponse function
-    const html = `<div class="chat-content" id="current-response">
-                    <div class="chat-details">
-                        <img src="/images/spring-ai-logo.png" alt="chatbot-img">
-                        <div class="typing-animation">
-                            <div class="typing-dot" style="--delay: 0.2s"></div>
-                            <div class="typing-dot" style="--delay: 0.3s"></div>
-                            <div class="typing-dot" style="--delay: 0.4s"></div>
-                        </div>
-                    </div>
-                    <span onclick="copyResponse(this)" class="material-symbols-rounded">content_copy</span>
-                </div>`;	
-    // Create an incoming chat div with typing animation and append it to chat container
-    const incomingChatDiv = createChatElement(html, "incoming");
-    chatContainer.appendChild(incomingChatDiv);
-    chatContainer.scrollTo(0, chatContainer.scrollHeight);
-    getChatResponse(incomingChatDiv);
+// ── Typing Animation + Send ───────────────────────────────────────────────
+function showTypingAnimation() {
+  const ts   = getTimestamp();
+  const html = `
+    <div class="chat-content" id="current-response">
+      <div class="chat-details">
+        <img src="/images/spring-ai-logo.png" alt="DocumentGPT">
+        <div class="message-wrapper">
+          <div class="typing-animation">
+            <div class="typing-dot" style="--delay:0.2s"></div>
+            <div class="typing-dot" style="--delay:0.3s"></div>
+            <div class="typing-dot" style="--delay:0.4s"></div>
+          </div>
+          <span class="timestamp">${ts}</span>
+        </div>
+      </div>
+      <button class="copy-btn icon-btn" onclick="copyResponse(this)" title="Copy response">
+        <span class="material-symbols-rounded">content_copy</span>
+      </button>
+    </div>`;
+
+  const incomingDiv = document.createElement("div");
+  incomingDiv.className = "chat incoming";
+  incomingDiv.innerHTML = html;
+  chatContainer?.appendChild(incomingDiv);
+  scrollToBottom("smooth");
+
+  try {
+    ws.send(userText);
+  } catch (err) {
+    showToast("Failed to send message. Please try again.", "error");
+    isStreaming = false;
+    streamBuffer = "";
+    document.getElementById("current-response")?.remove();
+  }
 }
 
-const copyResponse = (copyBtn) => {
-    // Copy the text content of the response to the clipboard
-    const reponseTextElement = copyBtn.parentElement.querySelector("p");
-    navigator.clipboard.writeText(reponseTextElement.textContent);
-    copyBtn.textContent = "done";
-    setTimeout(() => copyBtn.textContent = "content_copy", 1000);
+// ── Copy Response ─────────────────────────────────────────────────────────
+function copyResponse(btn) {
+  const content = btn.closest(".chat-content")?.querySelector(".ai-message-content, p");
+  if (!content) return;
+  navigator.clipboard.writeText(content.textContent).then(() => {
+    btn.querySelector(".material-symbols-rounded").textContent = "done";
+    setTimeout(() => btn.querySelector(".material-symbols-rounded").textContent = "content_copy", 1500);
+  });
 }
 
-loadDataFromLocalstorage();
-sendButton.addEventListener("click", handleOutgoingChat);
+// ── Scroll Helpers ────────────────────────────────────────────────────────
+function scrollToBottom(behavior = "smooth") {
+  chatContainer?.scrollTo({ top: chatContainer.scrollHeight, behavior });
+}
+
+function checkScrollBtn() {
+  if (!scrollBottomBtn || !chatContainer) return;
+  const atBottom = chatContainer.scrollTop + chatContainer.clientHeight >= chatContainer.scrollHeight - 60;
+  scrollBottomBtn.classList.toggle("hidden", atBottom);
+}
+
+// ── Delete Chat ───────────────────────────────────────────────────────────
+function deleteChat() {
+  if (!confirm("Clear all chat history? This cannot be undone.")) return;
+  localStorage.removeItem("all-chats");
+  loadChatFromStorage();
+  showToast("Chat history cleared.", "info");
+}
+
+// ── Event Listeners ───────────────────────────────────────────────────────
+if (chatInput) {
+  initialInputHeight = chatInput.scrollHeight || 55;
+
+  chatInput.addEventListener("input", () => {
+    chatInput.style.height = `${initialInputHeight}px`;
+    chatInput.style.height = `${chatInput.scrollHeight}px`;
+  });
+
+  chatInput.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey && window.innerWidth > 600) {
+      e.preventDefault();
+      handleOutgoingChat();
+    }
+  });
+}
+
+sendBtn?.addEventListener("click", handleOutgoingChat);
+deleteBtn?.addEventListener("click", deleteChat);
+themeToggle?.addEventListener("click", toggleTheme);
+
+scrollBottomBtn?.addEventListener("click", () => scrollToBottom("smooth"));
+chatContainer?.addEventListener("scroll", checkScrollBtn);
+
+sidebarCollapseBtn?.addEventListener("click", toggleSidebarCollapse);
+sidebarToggleDesk?.addEventListener("click", toggleSidebarCollapse);
+sidebarToggleMob?.addEventListener("click", toggleSidebarMobile);
+
+// Close mobile sidebar when clicking outside
+document.addEventListener("click", e => {
+  if (window.innerWidth <= 768 &&
+      appWrapper?.classList.contains("sidebar-open") &&
+      !sidebar?.contains(e.target) &&
+      !sidebarToggleMob?.contains(e.target)) {
+    appWrapper.classList.remove("sidebar-open");
+  }
+});
+
+// ── Initialise ────────────────────────────────────────────────────────────
+initTheme();
+loadChatFromStorage();
+initSidebar();
