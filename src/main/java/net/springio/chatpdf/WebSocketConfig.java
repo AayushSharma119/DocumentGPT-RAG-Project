@@ -3,14 +3,18 @@ package net.springio.chatpdf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import reactor.core.Disposable;
 
 import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Configuration
 @EnableWebSocket
@@ -19,6 +23,7 @@ class WebSocketConfig implements WebSocketConfigurer {
     private static final Logger log = LoggerFactory.getLogger(WebSocketConfig.class);
 
     private final DocumentService documentService;
+    private final Map<String, Disposable> activeSubscriptions = new ConcurrentHashMap<>();
 
     WebSocketConfig(DocumentService documentService) {
         this.documentService = documentService;
@@ -29,16 +34,52 @@ class WebSocketConfig implements WebSocketConfigurer {
         registry.addHandler(new TextWebSocketHandler() {
             @Override
             public void handleTextMessage(WebSocketSession session, TextMessage message) {
-                documentService.streamQuestion(message.getPayload())
+                String payload = message.getPayload();
+
+                // Stop generating if client requested cancellation
+                if ("[STOP]".equalsIgnoreCase(payload.trim())) {
+                    log.info("Received stop command from session: {}", session.getId());
+                    stopSessionStream(session.getId());
+                    sendSafe(session, "[DONE]");
+                    return;
+                }
+
+                // If already streaming for this session, cancel previous
+                stopSessionStream(session.getId());
+
+                Disposable subscription = documentService.streamQuestion(payload)
                         .doOnNext(token -> sendSafe(session, token))
-                        .doOnComplete(() -> sendSafe(session, "[DONE]"))
+                        .doOnComplete(() -> {
+                            activeSubscriptions.remove(session.getId());
+                            sendSafe(session, "[DONE]");
+                        })
                         .doOnError(e -> {
-                            log.error("Streaming error", e);
+                            activeSubscriptions.remove(session.getId());
+                            log.error("Streaming error for session {}: {}", session.getId(), e.getMessage());
                             sendSafe(session, "[ERROR]:" + e.getMessage());
                         })
+                        .doOnCancel(() -> {
+                            activeSubscriptions.remove(session.getId());
+                            log.info("Stream cancelled for session: {}", session.getId());
+                        })
                         .subscribe();
+
+                activeSubscriptions.put(session.getId(), subscription);
+            }
+
+            @Override
+            public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+                stopSessionStream(session.getId());
             }
         }, "/ws-chat").setAllowedOrigins("*");
+    }
+
+    private void stopSessionStream(String sessionId) {
+        Disposable disposable = activeSubscriptions.remove(sessionId);
+        if (disposable != null && !disposable.isDisposed()) {
+            disposable.dispose();
+            log.info("Disposed active stream for session: {}", sessionId);
+        }
     }
 
     private void sendSafe(WebSocketSession session, String text) {

@@ -705,6 +705,66 @@ body {
   gap: 6px;
 }
 
+/* ── Stop Generating Button ──────────────────────────────────── */
+.stop-generating-btn {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--glass-border);
+  border-radius: 99px;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition);
+  margin-bottom: 2px;
+}
+
+.stop-generating-btn:hover {
+  background: var(--danger-hover);
+  border-color: var(--danger);
+  color: var(--danger);
+  transform: translateY(-1px);
+}
+
+.stop-generating-btn .material-symbols-rounded {
+  font-size: 1rem;
+  color: var(--danger);
+}
+
+.stop-generating-btn.hidden {
+  display: none;
+}
+
+/* Morph send-btn when in stop mode */
+.send-btn.stop-mode {
+  background: var(--danger) !important;
+  color: #ffffff !important;
+  animation: stopPulse 1.8s infinite;
+}
+
+.send-btn.stop-mode:hover {
+  background: #d32f2f !important;
+  transform: scale(1.08);
+}
+
+@keyframes stopPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 83, 80, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(239, 83, 80, 0); }
+}
+
+.stopped-tag {
+  display: inline-block;
+  font-size: 0.76rem;
+  font-style: italic;
+  color: var(--text-muted);
+  margin-left: 6px;
+}
+
 .typing-textarea {
   display: flex;
   align-items: flex-end;

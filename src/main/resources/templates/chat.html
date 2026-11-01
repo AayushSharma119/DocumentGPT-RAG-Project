@@ -107,6 +107,10 @@
       <!-- Input Area -->
       <div class="typing-container">
         <div class="typing-content">
+          <!-- Stop generating button (visible during AI generation) -->
+          <button class="stop-generating-btn hidden" id="stop-generating-btn" type="button" title="Stop generating (Esc)">
+            <span class="material-symbols-rounded">stop_circle</span> Stop generating
+          </button>
           <div class="typing-textarea">
             <textarea id="chat-input" spellcheck="false"
               placeholder="Ask a question about your document…" required></textarea>

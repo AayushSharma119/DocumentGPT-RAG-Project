@@ -1,11 +1,14 @@
 /* ============================================================
    DocumentGPT — Chat Frontend
-   All 10 improvements implemented:
-   1. Streaming responses          6. Glassmorphism (CSS)
-   2. Markdown + DOMPurify (XSS)  7. Toast notifications
-   3. Timestamps                  8. Light/Dark mode
-   4. Document sidebar            9. Mobile improvements (CSS)
-   5. Drag & drop (index.html)   10. Upload progress (index.html)
+   Features:
+   1. Streaming responses (with Stop Response capability)
+   2. Markdown + DOMPurify (XSS safe)
+   3. Timestamps on messages
+   4. Document context sidebar
+   5. Toast notifications
+   6. Light/Dark mode
+   7. Glassmorphism styling
+   8. Mobile responsive with drawer
    ============================================================ */
 
 // ── Marked.js Configuration ──────────────────────────────────────────────
@@ -19,6 +22,7 @@ if (typeof marked !== "undefined") {
 // ── DOM References ────────────────────────────────────────────────────────
 const chatInput         = document.getElementById("chat-input");
 const sendBtn           = document.getElementById("send-btn");
+const stopGeneratingBtn = document.getElementById("stop-generating-btn");
 const chatContainer     = document.getElementById("chat-container");
 const deleteBtn         = document.getElementById("delete-btn");
 const themeToggle       = document.getElementById("theme-toggle");
@@ -31,9 +35,9 @@ const sidebarToggleDesk = document.getElementById("sidebar-toggle-desktop");
 const toastContainer    = document.getElementById("toast-container");
 
 // ── State ─────────────────────────────────────────────────────────────────
-let userText          = null;
-let isStreaming       = false;
-let streamBuffer      = "";
+let userText           = null;
+let isStreaming        = false;
+let streamBuffer       = "";
 let initialInputHeight = 55;
 
 // ── WebSocket Setup ───────────────────────────────────────────────────────
@@ -42,8 +46,14 @@ wsUrl.protocol   = wsUrl.protocol.replace("http", "ws");
 const ws         = new WebSocket(wsUrl.toString());
 
 ws.onopen = () => showToast("Connected to DocumentGPT", "success");
-ws.onclose = () => showToast("Connection closed. Please refresh.", "warning");
-ws.onerror = () => showToast("WebSocket error. Please refresh.", "error");
+ws.onclose = () => {
+  setStreamingState(false);
+  showToast("Connection closed. Please refresh.", "warning");
+};
+ws.onerror = () => {
+  setStreamingState(false);
+  showToast("WebSocket error. Please refresh.", "error");
+};
 
 ws.onmessage = function (event) {
   const data = event.data;
@@ -66,6 +76,61 @@ ws.onmessage = function (event) {
 };
 
 // ── Streaming Helpers ─────────────────────────────────────────────────────
+function setStreamingState(streaming) {
+  isStreaming = streaming;
+  if (streaming) {
+    stopGeneratingBtn?.classList.remove("hidden");
+    if (sendBtn) {
+      sendBtn.classList.add("stop-mode");
+      sendBtn.title = "Stop response";
+      const icon = sendBtn.querySelector(".material-symbols-rounded");
+      if (icon) icon.textContent = "stop";
+    }
+  } else {
+    stopGeneratingBtn?.classList.add("hidden");
+    if (sendBtn) {
+      sendBtn.classList.remove("stop-mode");
+      sendBtn.title = "Send";
+      const icon = sendBtn.querySelector(".material-symbols-rounded");
+      if (icon) icon.textContent = "send";
+    }
+    streamBuffer = "";
+  }
+}
+
+function stopStreaming() {
+  if (!isStreaming) return;
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send("[STOP]");
+  }
+
+  const bubble = document.getElementById("current-response");
+  if (bubble) {
+    bubble.querySelector(".typing-animation")?.remove();
+    let contentEl = bubble.querySelector(".ai-message-content");
+    if (!contentEl) {
+      contentEl = document.createElement("div");
+      contentEl.className = "ai-message-content";
+      bubble.querySelector(".message-wrapper")?.prepend(contentEl);
+    }
+    if (streamBuffer) {
+      contentEl.innerHTML = renderMarkdown(streamBuffer);
+    }
+    const stoppedTag = document.createElement("span");
+    stoppedTag.className = "stopped-tag";
+    stoppedTag.textContent = " (response stopped)";
+    contentEl.appendChild(stoppedTag);
+    bubble.removeAttribute("id");
+  }
+
+  setStreamingState(false);
+  saveChatToStorage();
+  scrollToBottom("smooth");
+  checkScrollBtn();
+  showToast("Response stopped.", "info");
+}
+
 function updateStreamBubble(text) {
   const bubble = document.getElementById("current-response");
   if (!bubble) return;
@@ -109,8 +174,7 @@ function finalizeStream() {
     }
     bubble.removeAttribute("id");
   }
-  isStreaming  = false;
-  streamBuffer = "";
+  setStreamingState(false);
   saveChatToStorage();
   scrollToBottom("smooth");
   checkScrollBtn();
@@ -166,14 +230,14 @@ function initSidebar() {
   const loadedCard = document.getElementById("doc-card-loaded");
 
   if (info && loadedCard) {
-    if (emptyCard)  emptyCard.style.display  = "none";
+    if (emptyCard) emptyCard.style.display = "none";
     loadedCard.style.display = "flex";
     const docNameEl = document.getElementById("doc-name");
     const docSizeEl = document.getElementById("doc-size");
     const docTimeEl = document.getElementById("doc-upload-time");
-    if (docNameEl) docNameEl.textContent = info.filename     || "document.pdf";
+    if (docNameEl) docNameEl.textContent = info.filename || "document.pdf";
     if (docSizeEl) docSizeEl.textContent = info.size ? formatBytes(parseInt(info.size)) : "—";
-    if (docTimeEl) docTimeEl.textContent = info.uploadTime   || "—";
+    if (docTimeEl) docTimeEl.textContent = info.uploadTime || "—";
   }
 }
 
@@ -217,10 +281,12 @@ function getTimestamp() {
 
 // ── Outgoing Message ──────────────────────────────────────────────────────
 function handleOutgoingChat() {
+  // If clicked while streaming, act as Stop button
   if (isStreaming) {
-    showToast("Please wait for the current response to finish.", "warning");
+    stopStreaming();
     return;
   }
+
   const text = chatInput?.value.trim();
   if (!text) return;
 
@@ -240,7 +306,7 @@ function handleOutgoingChat() {
   msgWrap.className = "message-wrapper";
 
   const textP     = document.createElement("p");
-  textP.textContent = userText;           // ✅ textContent is XSS-safe
+  textP.textContent = userText;
 
   const tsSpan    = document.createElement("span");
   tsSpan.className = "timestamp";
@@ -269,7 +335,7 @@ function handleOutgoingChat() {
   chatContainer?.appendChild(chatDiv);
   scrollToBottom("smooth");
 
-  isStreaming  = true;
+  setStreamingState(true);
   streamBuffer = "";
   setTimeout(showTypingAnimation, 400);
 }
@@ -305,8 +371,7 @@ function showTypingAnimation() {
     ws.send(userText);
   } catch (err) {
     showToast("Failed to send message. Please try again.", "error");
-    isStreaming = false;
-    streamBuffer = "";
+    setStreamingState(false);
     document.getElementById("current-response")?.remove();
   }
 }
@@ -356,6 +421,14 @@ if (chatInput) {
     }
   });
 }
+
+// Stop generation via button, send button or Escape key
+stopGeneratingBtn?.addEventListener("click", stopStreaming);
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && isStreaming) {
+    stopStreaming();
+  }
+});
 
 sendBtn?.addEventListener("click", handleOutgoingChat);
 deleteBtn?.addEventListener("click", deleteChat);
