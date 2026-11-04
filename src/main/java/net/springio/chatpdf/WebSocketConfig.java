@@ -47,7 +47,10 @@ class WebSocketConfig implements WebSocketConfigurer {
                 // If already streaming for this session, cancel previous
                 stopSessionStream(session.getId());
 
-                Disposable subscription = documentService.streamQuestion(payload)
+                // Use the WebSocket session ID as the conversation ID for memory continuity
+                String conversationId = session.getId();
+
+                Disposable subscription = documentService.streamQuestion(payload, conversationId)
                         .doOnNext(token -> sendSafe(session, token))
                         .doOnComplete(() -> {
                             activeSubscriptions.remove(session.getId());

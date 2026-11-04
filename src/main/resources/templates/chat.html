@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <title>DocumentGPT with Spring AI</title>
-  <link rel="stylesheet" href="/css/style.css">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/css/style.css?v=2">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Markdown + Sanitization -->
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
@@ -62,6 +62,10 @@
           <span class="material-symbols-rounded">swap_horiz</span> Replace Document
         </a>
       </div>
+
+      <!-- Previous Conversations -->
+      <div class="sidebar-section-label">Previous Conversations</div>
+      <div id="prev-conversations" class="prev-conversations-list"></div>
 
       <div class="sidebar-footer">
         <span class="sidebar-badge">Spring AI</span>

@@ -1,11 +1,40 @@
 /* ============================================================
-   DocumentGPT — Global Styles
+   DocumentGPT - Global Styles
    Dark (default) + Light mode via .light-mode body class
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-/* ── Reset ─────────────────────────────────────────────────── */
+/* Material Symbols Rounded - self-hosted with woff2 */
+@font-face {
+  font-family: 'Material Symbols Rounded';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url('../fonts/MaterialSymbolsRounded.woff2') format('woff2'),
+       url('/fonts/MaterialSymbolsRounded.woff2') format('woff2'),
+       url('../fonts/MaterialSymbolsRounded.ttf') format('truetype');
+}
+
+.material-symbols-rounded {
+  font-family: 'Material Symbols Rounded' !important;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'liga' 1;
+  user-select: none;
+}
+
+/* -- Reset ─────────────────────────────────────────────────── */
 *,
 *::before,
 *::after {
@@ -1186,4 +1215,64 @@ body {
   .upload-page {
     padding: 24px 14px;
   }
+}
+
+/* ── Previous Conversations Sidebar Section ── */
+.prev-conversations-list {
+  padding: 4px 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  max-height: 300px;
+}
+
+.prev-conv-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+.prev-conv-link {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prev-conv-link:hover {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.delete-icon {
+  font-size: 1rem !important;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition), background var(--transition);
+  flex-shrink: 0;
+}
+
+.delete-icon:hover {
+  color: var(--danger);
+  background: var(--danger-hover);
+}
+
+.no-conv {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  padding: 4px 16px;
+  font-style: italic;
 }
