@@ -137,7 +137,10 @@
     // ── File selection ─────────────────────────────────────────────────────
     function setFile(file) {
       if (!file) return;
-      if (!file.type.includes("pdf")) { showToast("Only PDF files are supported.", "error"); return; }
+      if (!file.name.toLowerCase().endsWith(".pdf")) {
+        showToast("Only PDF files are supported.", "error");
+        return;
+      }
       if (file.size > 10 * 1024 * 1024) { showToast("File exceeds 10 MB limit.", "warning"); return; }
       selectedFile = file;
       fileNameEl.textContent = file.name;

@@ -59,10 +59,6 @@ class DocumentService {
                 throw new IllegalArgumentException("PDF contains no extractable text.");
             }
 
-            if (tokens.isEmpty()) {
-                throw new IllegalStateException("No tokens were extracted from the PDF.");
-            }
-
             tokens.forEach(token -> token.getMetadata().put("documentId", documentId));
 
             vectorStore.write(tokens);
