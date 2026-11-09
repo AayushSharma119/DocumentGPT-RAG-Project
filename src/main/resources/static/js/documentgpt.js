@@ -244,57 +244,187 @@ function initSidebar() {
 }
 
 // ── Previous Conversations ────────────────────────────────────────────────
-function renderPreviousConversations() {
+
+async function renderPreviousConversations() {
   const container = document.getElementById("prev-conversations");
   if (!container) return;
-  const list = JSON.parse(localStorage.getItem("documentList") || "[]");
-  container.innerHTML = "";
-  if (list.length === 0) {
-    container.innerHTML = '<p class="no-conv">No previous chats</p>';
-    return;
+
+  container.innerHTML = '<p class="no-conv">Loading conversations...</p>';
+
+  try {
+    const response = await fetch("/conversations");
+
+    if (!response.ok) {
+      throw new Error("Failed to load conversations.");
+    }
+
+    const conversations = await response.json();
+    container.innerHTML = "";
+
+    if (conversations.length === 0) {
+      container.innerHTML = '<p class="no-conv">No previous chats</p>';
+      return;
+    }
+
+    conversations.forEach(conversation => {
+      const itemDiv = document.createElement("div");
+      itemDiv.className = "prev-conv-item";
+
+      const link = document.createElement("button");
+      link.className = "prev-conv-link";
+      link.textContent = conversation.title;
+      link.title = "Load conversation";
+
+      link.addEventListener("click", () => {
+        loadConversation(conversation);
+      });
+
+      itemDiv.appendChild(link);
+
+      const del = document.createElement("span");
+      del.className = "delete-icon material-symbols-rounded";
+      del.textContent = "close";
+      del.title = "Delete conversation";
+
+      del.addEventListener("click", async e => {
+        e.stopPropagation();
+
+        if (!confirm("Delete this conversation? This cannot be undone.")) {
+          return;
+        }
+
+        try {
+          const result = await fetch(
+            `/conversations/${encodeURIComponent(conversation.conversationId)}`,
+            { method: "DELETE" }
+          );
+
+          if (!result.ok) {
+            throw new Error("Failed to delete conversation.");
+          }
+
+          const activeInfo = JSON.parse(
+            sessionStorage.getItem("documentInfo") || "null"
+          );
+
+          if (activeInfo?.conversationId === conversation.conversationId) {
+            sessionStorage.removeItem("documentInfo");
+            loadChatFromStorage();
+            initSidebar();
+          }
+
+          renderPreviousConversations();
+          showToast("Conversation deleted.", "success");
+
+        } catch (error) {
+          showToast(error.message, "error");
+        }
+      });
+
+      itemDiv.appendChild(del);
+      container.appendChild(itemDiv);
+    });
+
+  } catch (error) {
+    container.innerHTML = '<p class="no-conv">Unable to load conversations</p>';
+    showToast(error.message, "error");
   }
-  list.forEach(key => {
-    const itemDiv = document.createElement("div");
-    itemDiv.className = "prev-conv-item";
-
-    const link = document.createElement("button");
-    link.className = "prev-conv-link";
-    link.textContent = key.replace("chat_", "").replace(/_/g, " ");
-    link.title = "Load conversation";
-    link.addEventListener("click", () => {
-      const html = localStorage.getItem(key);
-      if (chatContainer) {
-        chatContainer.innerHTML = html || "";
-        scrollToBottom("instant");
-        checkScrollBtn();
-      }
-      sessionStorage.setItem("activeChatKey", key);
-    });
-    itemDiv.appendChild(link);
-
-    const del = document.createElement("span");
-    del.className = "delete-icon material-symbols-rounded";
-    del.textContent = "close";
-    del.title = "Delete conversation";
-    del.addEventListener("click", e => {
-      e.stopPropagation();
-      if (!confirm("Delete this conversation? This cannot be undone.")) return;
-      localStorage.removeItem(key);
-      let lst = JSON.parse(localStorage.getItem("documentList") || "[]");
-      lst = lst.filter(k => k !== key);
-      localStorage.setItem("documentList", JSON.stringify(lst));
-      if (sessionStorage.getItem("activeChatKey") === key) {
-        sessionStorage.removeItem("activeChatKey");
-        loadChatFromStorage();
-      }
-      renderPreviousConversations();
-      showToast("Conversation deleted.", "info");
-    });
-    itemDiv.appendChild(del);
-
-    container.appendChild(itemDiv);
-  });
 }
+
+
+async function loadConversation(conversation) {
+  try {
+    const response = await fetch(
+      `/conversations/${encodeURIComponent(conversation.conversationId)}/messages`
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to load conversation messages.");
+    }
+
+    const messages = await response.json();
+
+    sessionStorage.setItem("documentInfo", JSON.stringify({
+      documentId: conversation.documentId,
+      conversationId: conversation.conversationId,
+      filename: conversation.title,
+      size: 0,
+      uploadTime: ""
+    }));
+
+    initSidebar();
+
+    chatContainer.innerHTML = "";
+
+    messages.forEach(message => {
+      const chatDiv = document.createElement("div");
+      chatDiv.className = message.role === "user"
+        ? "chat outgoing"
+        : "chat incoming";
+
+      const content = document.createElement("div");
+      content.className = "chat-content";
+
+      const details = document.createElement("div");
+      details.className = "chat-details";
+
+      const img = document.createElement("img");
+      img.src = message.role === "user"
+        ? "/images/person.png"
+        : "/images/spring-ai-logo.png";
+      img.alt = message.role === "user" ? "You" : "DocumentGPT";
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "message-wrapper";
+
+      const messageContent = document.createElement("div");
+
+      if (message.role === "user") {
+        const p = document.createElement("p");
+        p.textContent = message.content;
+        wrapper.appendChild(p);
+      } else {
+        messageContent.className = "ai-message-content";
+        messageContent.innerHTML = renderMarkdown(message.content);
+        wrapper.appendChild(messageContent);
+      }
+
+      const timestamp = document.createElement("span");
+      timestamp.className = "timestamp";
+      timestamp.textContent = message.createdAt
+        ? new Date(message.createdAt).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit"
+        })
+        : "";
+
+      wrapper.appendChild(timestamp);
+      details.appendChild(img);
+      details.appendChild(wrapper);
+      content.appendChild(details);
+      chatDiv.appendChild(content);
+
+      if (message.role === "assistant") {
+        const copyBtn = document.createElement("button");
+        copyBtn.className = "copy-btn icon-btn";
+        copyBtn.title = "Copy response";
+        copyBtn.innerHTML =
+          '<span class="material-symbols-rounded">content_copy</span>';
+        copyBtn.addEventListener("click", () => copyResponse(copyBtn));
+        content.appendChild(copyBtn);
+      }
+
+      chatContainer.appendChild(chatDiv);
+    });
+
+    scrollToBottom("instant");
+    checkScrollBtn();
+
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
 
 function formatBytes(b) {
   if (b < 1024) return b + " B";
@@ -452,7 +582,8 @@ function showTypingAnimation() {
 
     ws.send(JSON.stringify({
       question: userText,
-      documentId: info.documentId
+      documentId: info.documentId,
+      conversationId: info.conversationId
     }));
   } catch (err) {
     showToast("Failed to send message. Please try again.", "error");

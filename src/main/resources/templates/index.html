@@ -197,6 +197,7 @@
             progressLabel.textContent = "✔ Processing complete! Redirecting…";
             sessionStorage.setItem("documentInfo", JSON.stringify({
               documentId: data.documentId,
+              conversationId: data.conversationId,
               filename: data.filename,
               size: data.size,
               uploadTime: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })

@@ -60,8 +60,8 @@ class WebSocketConfig implements WebSocketConfigurer {
                     return;
                 }
 
-                if (request.documentId() == null || request.question() == null
-                        || request.question().isBlank()) {
+                if (request.documentId() == null || request.conversationId() == null
+                        || request.question() == null || request.question().isBlank()) {
                     sendSafe(session, "[ERROR]:Document ID and question are required.");
                     return;
                 }
@@ -72,30 +72,64 @@ class WebSocketConfig implements WebSocketConfigurer {
                     return;
                 }
 
-                String conversationId = documentService.getConversationId(
-                        session.getId(), request.documentId());
+                try {
+                    UUID.fromString(request.conversationId());
 
-                Disposable subscription = documentService.streamQuestion(
-                        request.question(),
-                        conversationId,
-                        request.documentId())
-                        .doOnNext(token -> sendSafe(session, token))
-                        .doOnComplete(() -> {
-                            activeSubscriptions.remove(session.getId());
-                            sendSafe(session, "[DONE]");
-                        })
-                        .doOnError(e -> {
-                            activeSubscriptions.remove(session.getId());
-                            log.error("Streaming error for session {}: {}", session.getId(), e.getMessage());
-                            sendSafe(session, "[ERROR]:" + e.getMessage());
-                        })
-                        .doOnCancel(() -> {
-                            activeSubscriptions.remove(session.getId());
-                            log.info("Stream cancelled for session: {}", session.getId());
-                        })
-                        .subscribe();
+                    if (!documentService.conversationBelongsToDocument(
+                            request.conversationId(), request.documentId())) {
+                        sendSafe(session, "[ERROR]:Invalid conversation for this document.");
+                        return;
+                    }
 
-                activeSubscriptions.put(session.getId(), subscription);
+                    String conversationId = request.conversationId();
+
+                    documentService.registerConversation(conversationId, request.documentId());
+                    documentService.saveMessage(conversationId, "user", request.question());
+
+                    StringBuilder assistantResponse = new StringBuilder();
+
+                    Disposable subscription = documentService.streamQuestion(
+                            request.question(),
+                            conversationId,
+                            request.documentId())
+                            .doOnNext(token -> {
+                                assistantResponse.append(token);
+                                sendSafe(session, token);
+                            })
+                            .doOnComplete(() -> {
+                                try {
+                                    if (!assistantResponse.isEmpty()) {
+                                        documentService.saveMessage(
+                                                conversationId,
+                                                "assistant",
+                                                assistantResponse.toString());
+                                    }
+                                } finally {
+                                    activeSubscriptions.remove(session.getId());
+                                    sendSafe(session, "[DONE]");
+                                }
+                            })
+                            .doOnError(e -> {
+                                activeSubscriptions.remove(session.getId());
+                                log.error("Streaming error for session {}: {}",
+                                        session.getId(), e.getMessage());
+                                sendSafe(session, "[ERROR]:Failed to generate response.");
+                            })
+                            .doOnCancel(() -> {
+                                activeSubscriptions.remove(session.getId());
+                                log.info("Stream cancelled for session: {}", session.getId());
+                            })
+                            .subscribe();
+
+                    activeSubscriptions.put(session.getId(), subscription);
+
+                } catch (IllegalArgumentException e) {
+                    sendSafe(session, "[ERROR]:Invalid conversation or document ID.");
+                } catch (RuntimeException e) {
+                    log.error("Failed to process chat request", e);
+                    sendSafe(session, "[ERROR]:Failed to process chat request.");
+                }
+
             }
 
             @Override
@@ -125,6 +159,9 @@ class WebSocketConfig implements WebSocketConfigurer {
         }
     }
 
-    private record ChatRequest(String question, String documentId) {
+    private record ChatRequest(
+            String question,
+            String documentId,
+            String conversationId) {
     }
 }

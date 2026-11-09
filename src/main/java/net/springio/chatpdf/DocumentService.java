@@ -15,7 +15,7 @@ import reactor.core.publisher.Flux;
 import org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
-
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,6 +29,7 @@ class DocumentService {
     private final VectorStore vectorStore;
     private final ChatMemory chatMemory;
     private final JdbcTemplate jdbcTemplate;
+    private volatile boolean chatTablesInitialized = false;
     private final Map<String, Set<String>> documentConversations = new ConcurrentHashMap<>();
     private final TokenTextSplitter tokenSplitter = new TokenTextSplitter();
 
@@ -86,6 +87,15 @@ class DocumentService {
         return conversationId;
     }
 
+    void registerConversation(String conversationId, String documentId) {
+        UUID.fromString(conversationId);
+        UUID.fromString(documentId);
+
+        documentConversations
+                .computeIfAbsent(documentId, id -> ConcurrentHashMap.newKeySet())
+                .add(conversationId);
+    }
+
     String askQuestion(String question, String conversationId, String documentId) {
         String filter = "documentId == '" + UUID.fromString(documentId) + "'";
 
@@ -122,5 +132,112 @@ class DocumentService {
         }
 
         return deletedChunks;
+    }
+
+    private synchronized void ensureChatTables() {
+        if (chatTablesInitialized) {
+            return;
+        }
+
+        jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS chat_conversations (
+                        id UUID PRIMARY KEY,
+                        document_id UUID NOT NULL,
+                        title VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """);
+
+        jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS chat_messages (
+                        id BIGSERIAL PRIMARY KEY,
+                        conversation_id UUID NOT NULL REFERENCES chat_conversations(id)
+                            ON DELETE CASCADE,
+                        role VARCHAR(20) NOT NULL,
+                        content TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """);
+
+        chatTablesInitialized = true;
+    }
+
+    String createConversation(String documentId, String title) {
+        ensureChatTables();
+
+        UUID documentUuid = UUID.fromString(documentId);
+        String conversationId = UUID.randomUUID().toString();
+
+        jdbcTemplate.update(
+                "INSERT INTO chat_conversations (id, document_id, title) VALUES (?, ?, ?)",
+                UUID.fromString(conversationId),
+                documentUuid,
+                title);
+
+        return conversationId;
+    }
+
+    void saveMessage(String conversationId, String role, String content) {
+        ensureChatTables();
+
+        jdbcTemplate.update(
+                "INSERT INTO chat_messages (conversation_id, role, content) VALUES (?, ?, ?)",
+                UUID.fromString(conversationId),
+                role,
+                content);
+
+        jdbcTemplate.update(
+                "UPDATE chat_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                UUID.fromString(conversationId));
+    }
+
+    List<Map<String, Object>> getConversations() {
+        ensureChatTables();
+
+        return jdbcTemplate.queryForList("""
+                    SELECT id AS "conversationId",
+                           document_id AS "documentId",
+                           title,
+                           created_at AS "createdAt"
+                    FROM chat_conversations
+                    ORDER BY updated_at DESC
+                """);
+    }
+
+    List<Map<String, Object>> getMessages(String conversationId) {
+        ensureChatTables();
+
+        return jdbcTemplate.queryForList("""
+                    SELECT role, content, created_at AS "createdAt"
+                    FROM chat_messages
+                    WHERE conversation_id = ?
+                    ORDER BY id ASC
+                """, UUID.fromString(conversationId));
+    }
+
+    boolean conversationBelongsToDocument(
+            String conversationId, String documentId) {
+        ensureChatTables();
+
+        Integer count = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*) FROM chat_conversations
+                    WHERE id = ? AND document_id = ?
+                """, Integer.class,
+                UUID.fromString(conversationId),
+                UUID.fromString(documentId));
+
+        return count != null && count > 0;
+    }
+
+    void deleteConversation(String conversationId) {
+        ensureChatTables();
+
+        UUID id = UUID.fromString(conversationId);
+
+        jdbcTemplate.update(
+                "DELETE FROM chat_conversations WHERE id = ?", id);
+
+        chatMemory.clear(conversationId);
     }
 }

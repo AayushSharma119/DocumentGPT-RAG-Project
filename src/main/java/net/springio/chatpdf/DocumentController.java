@@ -58,9 +58,13 @@ public class DocumentController {
 
         try {
             String documentId = documentService.loadDocument(document.getResource());
+            String conversationId = documentService.createConversation(
+                    documentId,
+                    Objects.requireNonNullElse(document.getOriginalFilename(), "document.pdf"));
             return ResponseEntity.ok(Map.of(
                     "success", true,
                     "documentId", documentId,
+                    "conversationId", conversationId,
                     "filename", Objects.requireNonNullElse(document.getOriginalFilename(), "document.pdf"),
                     "size", document.getSize()));
         } catch (IllegalArgumentException e) {
@@ -98,4 +102,45 @@ public class DocumentController {
                     .body(Map.of("success", false, "error", "Failed to delete document."));
         }
     }
+
+    @GetMapping("/conversations")
+    @ResponseBody
+    public ResponseEntity<?> getConversations() {
+        return ResponseEntity.ok(documentService.getConversations());
+    }
+
+    @GetMapping("/conversations/{conversationId}/messages")
+    @ResponseBody
+    public ResponseEntity<?> getConversationMessages(
+            @PathVariable String conversationId) {
+
+        try {
+            return ResponseEntity.ok(
+                    documentService.getMessages(conversationId));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Invalid conversation ID."));
+        }
+    }
+
+    @DeleteMapping("/conversations/{conversationId}")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> deleteConversation(
+            @PathVariable String conversationId) {
+
+        try {
+            documentService.deleteConversation(conversationId);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Conversation deleted successfully."));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("success", false,
+                            "error", "Invalid conversation ID."));
+        }
+    }
+
 }
