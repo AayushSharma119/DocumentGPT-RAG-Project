@@ -72,7 +72,8 @@ class WebSocketConfig implements WebSocketConfigurer {
                     return;
                 }
 
-                String conversationId = session.getId();
+                String conversationId = documentService.getConversationId(
+                        session.getId(), request.documentId());
 
                 Disposable subscription = documentService.streamQuestion(
                         request.question(),

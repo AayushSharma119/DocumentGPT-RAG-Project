@@ -16,6 +16,10 @@ import org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
 @Service
 class DocumentService {
 
@@ -25,6 +29,7 @@ class DocumentService {
     private final VectorStore vectorStore;
     private final ChatMemory chatMemory;
     private final JdbcTemplate jdbcTemplate;
+    private final Map<String, Set<String>> documentConversations = new ConcurrentHashMap<>();
     private final TokenTextSplitter tokenSplitter = new TokenTextSplitter();
 
     DocumentService(ChatClient chatClient, VectorStore vectorStore,
@@ -61,6 +66,18 @@ class DocumentService {
         }
     }
 
+    String getConversationId(String sessionId, String documentId) {
+        UUID.fromString(documentId);
+
+        String conversationId = sessionId + ":" + documentId;
+
+        documentConversations
+                .computeIfAbsent(documentId, id -> ConcurrentHashMap.newKeySet())
+                .add(conversationId);
+
+        return conversationId;
+    }
+
     String askQuestion(String question, String conversationId, String documentId) {
         String filter = "documentId == '" + UUID.fromString(documentId) + "'";
 
@@ -86,8 +103,16 @@ class DocumentService {
     int deleteDocument(String documentId) {
         UUID.fromString(documentId);
 
-        return jdbcTemplate.update(
+        int deletedChunks = jdbcTemplate.update(
                 "DELETE FROM documentgpt_vectors WHERE metadata ->> 'documentId' = ?",
                 documentId);
+
+        Set<String> conversations = documentConversations.remove(documentId);
+
+        if (conversations != null) {
+            conversations.forEach(chatMemory::clear);
+        }
+
+        return deletedChunks;
     }
 }
