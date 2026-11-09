@@ -442,25 +442,11 @@ function toggleSidebarMobile() {
 
 // ── Chat Persistence ──────────────────────────────────────────────────────
 function getChatStorageKey() {
-  const info = JSON.parse(sessionStorage.getItem("documentInfo") || "null");
-  if (info && info.filename && info.uploadTime) {
-    return `chat_${info.filename.replace(/\s+/g, "_")}_${info.uploadTime.replace(/[: ]/g, "_")}`;
-  }
-  return null; // No active document — don't save
+  return null;
 }
 
 function saveChatToStorage() {
-  if (!chatContainer) return;
-  const key = getChatStorageKey();
-  if (!key) return; // No document loaded yet
-  localStorage.setItem(key, chatContainer.innerHTML);
-  // Register key in the conversation index
-  let list = JSON.parse(localStorage.getItem("documentList") || "[]");
-  if (!list.includes(key)) {
-    list.push(key);
-    localStorage.setItem("documentList", JSON.stringify(list));
-    renderPreviousConversations();
-  }
+  // Chat messages are now saved by the backend.
 }
 
 function loadChatFromStorage() {
@@ -470,10 +456,10 @@ function loadChatFromStorage() {
       <h1>DocumentGPT</h1>
       <p>Upload a document and start asking questions.<br>Your conversation will appear here.</p>
     </div>`;
+
   if (!chatContainer) return;
-  const key = getChatStorageKey();
-  const saved = key ? localStorage.getItem(key) : null;
-  chatContainer.innerHTML = saved || defaultHTML;
+
+  chatContainer.innerHTML = defaultHTML;
   scrollToBottom("instant");
   checkScrollBtn();
 }
@@ -614,18 +600,40 @@ function checkScrollBtn() {
 }
 
 // ── Delete Current Chat ───────────────────────────────────────────────────
-function deleteChat() {
-  if (!confirm("Clear this chat history? This cannot be undone.")) return;
-  const key = getChatStorageKey();
-  if (key) {
-    localStorage.removeItem(key);
-    let list = JSON.parse(localStorage.getItem("documentList") || "[]");
-    list = list.filter(k => k !== key);
-    localStorage.setItem("documentList", JSON.stringify(list));
+async function deleteChat() {
+  const info = JSON.parse(
+    sessionStorage.getItem("documentInfo") || "null"
+  );
+
+  if (!info?.conversationId) {
+    showToast("No active conversation found.", "error");
+    return;
   }
-  loadChatFromStorage();
-  renderPreviousConversations();
-  showToast("Chat history cleared.", "info");
+
+  if (!confirm("Delete this conversation? This cannot be undone.")) {
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `/conversations/${encodeURIComponent(info.conversationId)}`,
+      { method: "DELETE" }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to delete conversation.");
+    }
+
+    sessionStorage.removeItem("documentInfo");
+    loadChatFromStorage();
+    initSidebar();
+    renderPreviousConversations();
+
+    showToast("Conversation deleted.", "success");
+
+  } catch (error) {
+    showToast(error.message, "error");
+  }
 }
 async function deleteDocument() {
   const info = JSON.parse(sessionStorage.getItem("documentInfo") || "null");
@@ -650,15 +658,6 @@ async function deleteDocument() {
       throw new Error(data.error || "Document deletion failed.");
     }
 
-    const key = getChatStorageKey();
-
-    if (key) {
-      localStorage.removeItem(key);
-
-      let list = JSON.parse(localStorage.getItem("documentList") || "[]");
-      list = list.filter(k => k !== key);
-      localStorage.setItem("documentList", JSON.stringify(list));
-    }
 
     sessionStorage.removeItem("documentInfo");
     sessionStorage.removeItem("activeChatKey");

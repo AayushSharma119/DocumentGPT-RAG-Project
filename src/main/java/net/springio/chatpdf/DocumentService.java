@@ -119,11 +119,12 @@ class DocumentService {
     }
 
     int deleteDocument(String documentId) {
+        ensureChatTables();
         UUID.fromString(documentId);
 
         int deletedChunks = jdbcTemplate.update(
                 "DELETE FROM documentgpt_vectors WHERE metadata ->> 'documentId' = ?",
-                documentId);
+                UUID.fromString(documentId));
 
         Set<String> conversations = documentConversations.remove(documentId);
 
@@ -240,4 +241,32 @@ class DocumentService {
 
         chatMemory.clear(conversationId);
     }
+
+    void restoreConversationMemory(String conversationId) {
+        if (!chatMemory.get(conversationId).isEmpty()) {
+            return;
+        }
+
+        List<Map<String, Object>> messages = getMessages(conversationId);
+
+        List<org.springframework.ai.chat.messages.Message> chatMessages = new java.util.ArrayList<>();
+
+        for (Map<String, Object> message : messages) {
+            String role = message.get("role").toString();
+            String content = message.get("content").toString();
+
+            if ("user".equals(role)) {
+                chatMessages.add(
+                        new org.springframework.ai.chat.messages.UserMessage(content));
+            } else if ("assistant".equals(role)) {
+                chatMessages.add(
+                        new org.springframework.ai.chat.messages.AssistantMessage(content));
+            }
+        }
+
+        if (!chatMessages.isEmpty()) {
+            chatMemory.add(conversationId, chatMessages);
+        }
+    }
+
 }
