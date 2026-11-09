@@ -84,6 +84,9 @@ class WebSocketConfig implements WebSocketConfigurer {
                     String conversationId = request.conversationId();
 
                     documentService.registerConversation(conversationId, request.documentId());
+
+                    documentService.restoreConversationMemory(conversationId);
+
                     documentService.saveMessage(conversationId, "user", request.question());
 
                     StringBuilder assistantResponse = new StringBuilder();
