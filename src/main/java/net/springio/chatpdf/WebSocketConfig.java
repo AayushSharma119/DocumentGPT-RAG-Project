@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.UUID;
 
 @Configuration
 @EnableWebSocket
@@ -62,6 +63,12 @@ class WebSocketConfig implements WebSocketConfigurer {
                 if (request.documentId() == null || request.question() == null
                         || request.question().isBlank()) {
                     sendSafe(session, "[ERROR]:Document ID and question are required.");
+                    return;
+                }
+                try {
+                    UUID.fromString(request.documentId());
+                } catch (IllegalArgumentException e) {
+                    sendSafe(session, "[ERROR]:Invalid document ID.");
                     return;
                 }
 
