@@ -120,11 +120,22 @@ class DocumentService {
 
     int deleteDocument(String documentId) {
         ensureChatTables();
-        UUID.fromString(documentId);
+        UUID documentUuid = UUID.fromString(documentId);
+
+        List<String> conversationIds = jdbcTemplate.queryForList(
+                "SELECT id::text FROM chat_conversations WHERE document_id = ?",
+                String.class,
+                documentUuid);
+
+        conversationIds.forEach(chatMemory::clear);
+
+        jdbcTemplate.update(
+                "DELETE FROM chat_conversations WHERE document_id = ?",
+                documentUuid);
 
         int deletedChunks = jdbcTemplate.update(
                 "DELETE FROM documentgpt_vectors WHERE metadata ->> 'documentId' = ?",
-                UUID.fromString(documentId));
+                documentId);
 
         Set<String> conversations = documentConversations.remove(documentId);
 

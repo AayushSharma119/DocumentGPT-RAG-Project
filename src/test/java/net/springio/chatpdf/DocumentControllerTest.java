@@ -57,11 +57,18 @@ class DocumentControllerTest {
 
         when(documentService.loadDocument(any()))
                 .thenReturn("123e4567-e89b-12d3-a456-426614174000");
+        when(documentService.createConversation(
+                "123e4567-e89b-12d3-a456-426614174000",
+                "test.pdf"))
+                .thenReturn("223e4567-e89b-12d3-a456-426614174000");
 
         ResponseEntity<?> response = controller.uploadDocument(file);
 
         assertEquals(200, response.getStatusCode().value());
         verify(documentService).loadDocument(any());
+        verify(documentService).createConversation(
+                "123e4567-e89b-12d3-a456-426614174000",
+                "test.pdf");
     }
 
     @Test
