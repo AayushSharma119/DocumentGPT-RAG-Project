@@ -9,6 +9,7 @@
    6. Light/Dark mode
    7. Glassmorphism styling
    8. Mobile responsive with drawer
+   9. Per-document chat persistence with Previous Conversations
    ============================================================ */
 
 // ── Marked.js Configuration ──────────────────────────────────────────────
@@ -241,6 +242,59 @@ function initSidebar() {
   }
 }
 
+// ── Previous Conversations ────────────────────────────────────────────────
+function renderPreviousConversations() {
+  const container = document.getElementById("prev-conversations");
+  if (!container) return;
+  const list = JSON.parse(localStorage.getItem("documentList") || "[]");
+  container.innerHTML = "";
+  if (list.length === 0) {
+    container.innerHTML = '<p class="no-conv">No previous chats</p>';
+    return;
+  }
+  list.forEach(key => {
+    const itemDiv = document.createElement("div");
+    itemDiv.className = "prev-conv-item";
+
+    const link = document.createElement("button");
+    link.className = "prev-conv-link";
+    link.textContent = key.replace("chat_", "").replace(/_/g, " ");
+    link.title = "Load conversation";
+    link.addEventListener("click", () => {
+      const html = localStorage.getItem(key);
+      if (chatContainer) {
+        chatContainer.innerHTML = html || "";
+        scrollToBottom("instant");
+        checkScrollBtn();
+      }
+      sessionStorage.setItem("activeChatKey", key);
+    });
+    itemDiv.appendChild(link);
+
+    const del = document.createElement("span");
+    del.className = "delete-icon material-symbols-rounded";
+    del.textContent = "close";
+    del.title = "Delete conversation";
+    del.addEventListener("click", e => {
+      e.stopPropagation();
+      if (!confirm("Delete this conversation? This cannot be undone.")) return;
+      localStorage.removeItem(key);
+      let lst = JSON.parse(localStorage.getItem("documentList") || "[]");
+      lst = lst.filter(k => k !== key);
+      localStorage.setItem("documentList", JSON.stringify(lst));
+      if (sessionStorage.getItem("activeChatKey") === key) {
+        sessionStorage.removeItem("activeChatKey");
+        loadChatFromStorage();
+      }
+      renderPreviousConversations();
+      showToast("Conversation deleted.", "info");
+    });
+    itemDiv.appendChild(del);
+
+    container.appendChild(itemDiv);
+  });
+}
+
 function formatBytes(b) {
   if (b < 1024) return b + " B";
   if (b < 1048576) return (b / 1024).toFixed(1) + " KB";
@@ -256,8 +310,26 @@ function toggleSidebarMobile() {
 }
 
 // ── Chat Persistence ──────────────────────────────────────────────────────
+function getChatStorageKey() {
+  const info = JSON.parse(sessionStorage.getItem("documentInfo") || "null");
+  if (info && info.filename && info.uploadTime) {
+    return `chat_${info.filename.replace(/\s+/g, "_")}_${info.uploadTime.replace(/[: ]/g, "_")}`;
+  }
+  return null; // No active document — don't save
+}
+
 function saveChatToStorage() {
-  if (chatContainer) localStorage.setItem("all-chats", chatContainer.innerHTML);
+  if (!chatContainer) return;
+  const key = getChatStorageKey();
+  if (!key) return; // No document loaded yet
+  localStorage.setItem(key, chatContainer.innerHTML);
+  // Register key in the conversation index
+  let list = JSON.parse(localStorage.getItem("documentList") || "[]");
+  if (!list.includes(key)) {
+    list.push(key);
+    localStorage.setItem("documentList", JSON.stringify(list));
+    renderPreviousConversations();
+  }
 }
 
 function loadChatFromStorage() {
@@ -267,11 +339,12 @@ function loadChatFromStorage() {
       <h1>DocumentGPT</h1>
       <p>Upload a document and start asking questions.<br>Your conversation will appear here.</p>
     </div>`;
-  if (chatContainer) {
-    chatContainer.innerHTML = localStorage.getItem("all-chats") || defaultHTML;
-    scrollToBottom("instant");
-    checkScrollBtn();
-  }
+  if (!chatContainer) return;
+  const key = getChatStorageKey();
+  const saved = key ? localStorage.getItem(key) : null;
+  chatContainer.innerHTML = saved || defaultHTML;
+  scrollToBottom("instant");
+  checkScrollBtn();
 }
 
 // ── Timestamp ─────────────────────────────────────────────────────────────
@@ -397,11 +470,18 @@ function checkScrollBtn() {
   scrollBottomBtn.classList.toggle("hidden", atBottom);
 }
 
-// ── Delete Chat ───────────────────────────────────────────────────────────
+// ── Delete Current Chat ───────────────────────────────────────────────────
 function deleteChat() {
-  if (!confirm("Clear all chat history? This cannot be undone.")) return;
-  localStorage.removeItem("all-chats");
+  if (!confirm("Clear this chat history? This cannot be undone.")) return;
+  const key = getChatStorageKey();
+  if (key) {
+    localStorage.removeItem(key);
+    let list = JSON.parse(localStorage.getItem("documentList") || "[]");
+    list = list.filter(k => k !== key);
+    localStorage.setItem("documentList", JSON.stringify(list));
+  }
   loadChatFromStorage();
+  renderPreviousConversations();
   showToast("Chat history cleared.", "info");
 }
 
@@ -455,3 +535,4 @@ document.addEventListener("click", e => {
 initTheme();
 loadChatFromStorage();
 initSidebar();
+renderPreviousConversations();

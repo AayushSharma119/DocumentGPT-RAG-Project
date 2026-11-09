@@ -3,6 +3,8 @@ package net.springio.chatpdf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
 import org.springframework.ai.reader.pdf.config.PdfDocumentReaderConfig;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
@@ -18,11 +20,13 @@ class DocumentService {
 
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
+    private final ChatMemory chatMemory;
     private final TokenTextSplitter tokenSplitter = new TokenTextSplitter();
 
-    DocumentService(ChatClient chatClient, VectorStore vectorStore) {
+    DocumentService(ChatClient chatClient, VectorStore vectorStore, ChatMemory chatMemory) {
         this.chatClient = chatClient;
         this.vectorStore = vectorStore;
+        this.chatMemory = chatMemory;
     }
 
     void loadDocument(Resource resource) {
@@ -40,11 +44,19 @@ class DocumentService {
         }
     }
 
-    String askQuestion(String question) {
-        return chatClient.prompt().user(question).call().content();
+    String askQuestion(String question, String conversationId) {
+        return chatClient.prompt()
+                .advisors(new MessageChatMemoryAdvisor(chatMemory, conversationId, 20))
+                .user(question)
+                .call()
+                .content();
     }
 
-    Flux<String> streamQuestion(String question) {
-        return chatClient.prompt().user(question).stream().content();
+    Flux<String> streamQuestion(String question, String conversationId) {
+        return chatClient.prompt()
+                .advisors(new MessageChatMemoryAdvisor(chatMemory, conversationId, 20))
+                .user(question)
+                .stream()
+                .content();
     }
 }
