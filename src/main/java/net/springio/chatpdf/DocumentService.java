@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor;
 import java.util.UUID;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @Service
 class DocumentService {
@@ -23,12 +24,15 @@ class DocumentService {
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
     private final ChatMemory chatMemory;
+    private final JdbcTemplate jdbcTemplate;
     private final TokenTextSplitter tokenSplitter = new TokenTextSplitter();
 
-    DocumentService(ChatClient chatClient, VectorStore vectorStore, ChatMemory chatMemory) {
+    DocumentService(ChatClient chatClient, VectorStore vectorStore,
+            ChatMemory chatMemory, JdbcTemplate jdbcTemplate) {
         this.chatClient = chatClient;
         this.vectorStore = vectorStore;
         this.chatMemory = chatMemory;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     String loadDocument(Resource resource) {
@@ -77,5 +81,13 @@ class DocumentService {
                 .user(question)
                 .stream()
                 .content();
+    }
+
+    int deleteDocument(String documentId) {
+        UUID.fromString(documentId);
+
+        return jdbcTemplate.update(
+                "DELETE FROM documentgpt_vectors WHERE metadata ->> 'documentId' = ?",
+                documentId);
     }
 }

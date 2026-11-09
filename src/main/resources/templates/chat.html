@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
+
 <head>
   <meta charset="utf-8">
   <title>DocumentGPT with Spring AI</title>
   <link rel="stylesheet" href="/css/style.css?v=2">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"/>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Markdown + Sanitization -->
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
@@ -17,6 +19,7 @@
     })();
   </script>
 </head>
+
 <body>
 
   <!-- Toast Container -->
@@ -61,6 +64,10 @@
         <a href="/" class="btn-upload-new" style="margin-top:12px;">
           <span class="material-symbols-rounded">swap_horiz</span> Replace Document
         </a>
+        <button type="button" class="btn-upload-new" id="delete-document-btn" style="margin-top:8px; color:#ef4444;">
+          <span class="material-symbols-rounded">delete</span>
+          Delete Document
+        </button>
       </div>
 
       <!-- Previous Conversations -->
@@ -112,12 +119,13 @@
       <div class="typing-container">
         <div class="typing-content">
           <!-- Stop generating button (visible during AI generation) -->
-          <button class="stop-generating-btn hidden" id="stop-generating-btn" type="button" title="Stop generating (Esc)">
+          <button class="stop-generating-btn hidden" id="stop-generating-btn" type="button"
+            title="Stop generating (Esc)">
             <span class="material-symbols-rounded">stop_circle</span> Stop generating
           </button>
           <div class="typing-textarea">
-            <textarea id="chat-input" spellcheck="false"
-              placeholder="Ask a question about your document…" required></textarea>
+            <textarea id="chat-input" spellcheck="false" placeholder="Ask a question about your document…"
+              required></textarea>
             <button class="send-btn" id="send-btn" title="Send">
               <span class="material-symbols-rounded">send</span>
             </button>
@@ -130,4 +138,5 @@
   </div><!-- /app-wrapper -->
 
 </body>
+
 </html>

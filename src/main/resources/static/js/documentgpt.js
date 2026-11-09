@@ -26,6 +26,7 @@ const sendBtn = document.getElementById("send-btn");
 const stopGeneratingBtn = document.getElementById("stop-generating-btn");
 const chatContainer = document.getElementById("chat-container");
 const deleteBtn = document.getElementById("delete-btn");
+const deleteDocumentBtn = document.getElementById("delete-document-btn");
 const themeToggle = document.getElementById("theme-toggle");
 const scrollBottomBtn = document.getElementById("scroll-bottom-btn");
 const sidebar = document.getElementById("sidebar");
@@ -495,6 +496,52 @@ function deleteChat() {
   renderPreviousConversations();
   showToast("Chat history cleared.", "info");
 }
+async function deleteDocument() {
+  const info = JSON.parse(sessionStorage.getItem("documentInfo") || "null");
+
+  if (!info?.documentId) {
+    showToast("No active document found.", "error");
+    return;
+  }
+
+  if (!confirm("Permanently delete this document and all its stored data?")) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/documents/${encodeURIComponent(info.documentId)}`, {
+      method: "DELETE"
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || "Document deletion failed.");
+    }
+
+    const key = getChatStorageKey();
+
+    if (key) {
+      localStorage.removeItem(key);
+
+      let list = JSON.parse(localStorage.getItem("documentList") || "[]");
+      list = list.filter(k => k !== key);
+      localStorage.setItem("documentList", JSON.stringify(list));
+    }
+
+    sessionStorage.removeItem("documentInfo");
+    sessionStorage.removeItem("activeChatKey");
+
+    loadChatFromStorage();
+    initSidebar();
+    renderPreviousConversations();
+
+    showToast("Document and its stored vectors deleted successfully.", "success");
+
+  } catch (error) {
+    showToast(error.message || "Failed to delete document.", "error");
+  }
+}
 
 // ── Event Listeners ───────────────────────────────────────────────────────
 if (chatInput) {
@@ -523,6 +570,7 @@ document.addEventListener("keydown", e => {
 
 sendBtn?.addEventListener("click", handleOutgoingChat);
 deleteBtn?.addEventListener("click", deleteChat);
+deleteDocumentBtn?.addEventListener("click", deleteDocument);
 themeToggle?.addEventListener("click", toggleTheme);
 
 scrollBottomBtn?.addEventListener("click", () => scrollToBottom("smooth"));
