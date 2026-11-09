@@ -12,6 +12,8 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor;
+import java.util.UUID;
 
 @Service
 class DocumentService {
@@ -29,34 +31,50 @@ class DocumentService {
         this.chatMemory = chatMemory;
     }
 
-    void loadDocument(Resource resource) {
+    String loadDocument(Resource resource) {
         try {
-            var pdfReader = new PagePdfDocumentReader(resource, PdfDocumentReaderConfig.defaultConfig());
+            String documentId = UUID.randomUUID().toString();
+
+            var pdfReader = new PagePdfDocumentReader(
+                    resource, PdfDocumentReaderConfig.defaultConfig());
+
             var tokens = tokenSplitter.split(pdfReader.read());
+
             if (tokens.isEmpty()) {
                 throw new IllegalStateException("No tokens were extracted from the PDF.");
             }
+
+            tokens.forEach(token -> token.getMetadata().put("documentId", documentId));
+
             vectorStore.write(tokens);
-            log.info("Document uploaded to vector store. Token count: {}", tokens.size());
+
+            log.info("Document uploaded. ID: {}, chunks: {}", documentId, tokens.size());
+            return documentId;
+
         } catch (Exception e) {
             log.error("Failed to load document", e);
             throw new RuntimeException("Failed to load document: " + e.getMessage(), e);
         }
     }
 
-    String askQuestion(String question, String conversationId) {
+    String askQuestion(String question, String conversationId, String documentId) {
+        String filter = "documentId == '" + UUID.fromString(documentId) + "'";
+
         return chatClient.prompt()
                 .advisors(new MessageChatMemoryAdvisor(chatMemory, conversationId, 20))
+                .advisors(a -> a.param(QuestionAnswerAdvisor.FILTER_EXPRESSION, filter))
                 .user(question)
                 .call()
                 .content();
     }
 
-    Flux<String> streamQuestion(String question, String conversationId) {
-        return chatClient.prompt()
-                .advisors(new MessageChatMemoryAdvisor(chatMemory, conversationId, 20))
-                .user(question)
-                .stream()
-                .content();
-    }
+    Flux<String> streamQuestion(String question, String conversationId, String documentId) {
+    String filter = "documentId == '" + UUID.fromString(documentId) + "'";
+
+    return chatClient.prompt()
+            .advisors(new MessageChatMemoryAdvisor(chatMemory, conversationId, 20))
+            .advisors(a -> a.param(QuestionAnswerAdvisor.FILTER_EXPRESSION, filter))
+            .user(question)
+            .stream()
+            .content();
 }

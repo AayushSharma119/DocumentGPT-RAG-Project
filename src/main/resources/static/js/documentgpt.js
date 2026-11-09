@@ -21,30 +21,30 @@ if (typeof marked !== "undefined") {
 }
 
 // ── DOM References ────────────────────────────────────────────────────────
-const chatInput         = document.getElementById("chat-input");
-const sendBtn           = document.getElementById("send-btn");
+const chatInput = document.getElementById("chat-input");
+const sendBtn = document.getElementById("send-btn");
 const stopGeneratingBtn = document.getElementById("stop-generating-btn");
-const chatContainer     = document.getElementById("chat-container");
-const deleteBtn         = document.getElementById("delete-btn");
-const themeToggle       = document.getElementById("theme-toggle");
-const scrollBottomBtn   = document.getElementById("scroll-bottom-btn");
-const sidebar           = document.getElementById("sidebar");
-const appWrapper        = document.getElementById("app-wrapper");
-const sidebarToggleMob  = document.getElementById("sidebar-toggle-mobile");
+const chatContainer = document.getElementById("chat-container");
+const deleteBtn = document.getElementById("delete-btn");
+const themeToggle = document.getElementById("theme-toggle");
+const scrollBottomBtn = document.getElementById("scroll-bottom-btn");
+const sidebar = document.getElementById("sidebar");
+const appWrapper = document.getElementById("app-wrapper");
+const sidebarToggleMob = document.getElementById("sidebar-toggle-mobile");
 const sidebarCollapseBtn = document.getElementById("sidebar-collapse-btn");
 const sidebarToggleDesk = document.getElementById("sidebar-toggle-desktop");
-const toastContainer    = document.getElementById("toast-container");
+const toastContainer = document.getElementById("toast-container");
 
 // ── State ─────────────────────────────────────────────────────────────────
-let userText           = null;
-let isStreaming        = false;
-let streamBuffer       = "";
+let userText = null;
+let isStreaming = false;
+let streamBuffer = "";
 let initialInputHeight = 55;
 
 // ── WebSocket Setup ───────────────────────────────────────────────────────
-const wsUrl      = new URL("/ws-chat", location.href);
-wsUrl.protocol   = wsUrl.protocol.replace("http", "ws");
-const ws         = new WebSocket(wsUrl.toString());
+const wsUrl = new URL("/ws-chat", location.href);
+wsUrl.protocol = wsUrl.protocol.replace("http", "ws");
+const ws = new WebSocket(wsUrl.toString());
 
 ws.onopen = () => showToast("Connected to DocumentGPT", "success");
 ws.onclose = () => {
@@ -227,7 +227,7 @@ function syncThemeIcon() {
 // ── Sidebar ───────────────────────────────────────────────────────────────
 function initSidebar() {
   const info = JSON.parse(sessionStorage.getItem("documentInfo") || "null");
-  const emptyCard  = document.getElementById("doc-card-empty");
+  const emptyCard = document.getElementById("doc-card-empty");
   const loadedCard = document.getElementById("doc-card-loaded");
 
   if (info && loadedCard) {
@@ -375,32 +375,32 @@ function handleOutgoingChat() {
   }
 
   // Build outgoing bubble safely (no innerHTML with user content → no XSS)
-  const msgWrap   = document.createElement("div");
+  const msgWrap = document.createElement("div");
   msgWrap.className = "message-wrapper";
 
-  const textP     = document.createElement("p");
+  const textP = document.createElement("p");
   textP.textContent = userText;
 
-  const tsSpan    = document.createElement("span");
+  const tsSpan = document.createElement("span");
   tsSpan.className = "timestamp";
   tsSpan.textContent = getTimestamp();
 
   msgWrap.appendChild(textP);
   msgWrap.appendChild(tsSpan);
 
-  const details   = document.createElement("div");
+  const details = document.createElement("div");
   details.className = "chat-details";
-  const img       = document.createElement("img");
+  const img = document.createElement("img");
   img.src = "/images/person.png";
   img.alt = "You";
   details.appendChild(img);
   details.appendChild(msgWrap);
 
-  const content   = document.createElement("div");
+  const content = document.createElement("div");
   content.className = "chat-content";
   content.appendChild(details);
 
-  const chatDiv   = document.createElement("div");
+  const chatDiv = document.createElement("div");
   chatDiv.className = "chat outgoing";
   chatDiv.appendChild(content);
 
@@ -415,7 +415,7 @@ function handleOutgoingChat() {
 
 // ── Typing Animation + Send ───────────────────────────────────────────────
 function showTypingAnimation() {
-  const ts   = getTimestamp();
+  const ts = getTimestamp();
   const html = `
     <div class="chat-content" id="current-response">
       <div class="chat-details">
@@ -441,7 +441,18 @@ function showTypingAnimation() {
   scrollToBottom("smooth");
 
   try {
-    ws.send(userText);
+    const info = JSON.parse(sessionStorage.getItem("documentInfo") || "null");
+
+    if (!info?.documentId) {
+      showToast("No active document found. Please upload a PDF.", "error");
+      setStreamingState(false);
+      return;
+    }
+
+    ws.send(JSON.stringify({
+      question: userText,
+      documentId: info.documentId
+    }));
   } catch (err) {
     showToast("Failed to send message. Please try again.", "error");
     setStreamingState(false);
@@ -524,9 +535,9 @@ sidebarToggleMob?.addEventListener("click", toggleSidebarMobile);
 // Close mobile sidebar when clicking outside
 document.addEventListener("click", e => {
   if (window.innerWidth <= 768 &&
-      appWrapper?.classList.contains("sidebar-open") &&
-      !sidebar?.contains(e.target) &&
-      !sidebarToggleMob?.contains(e.target)) {
+    appWrapper?.classList.contains("sidebar-open") &&
+    !sidebar?.contains(e.target) &&
+    !sidebarToggleMob?.contains(e.target)) {
     appWrapper.classList.remove("sidebar-open");
   }
 });

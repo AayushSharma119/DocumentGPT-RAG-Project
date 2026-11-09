@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
+
 <head>
   <meta charset="utf-8">
   <title>DocumentGPT — Upload</title>
   <link rel="stylesheet" href="/css/style.css?v=2">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"/>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script>
     // Apply saved theme before render to prevent flash
@@ -13,6 +15,7 @@
     })();
   </script>
 </head>
+
 <body>
 
   <!-- Toast Container -->
@@ -35,7 +38,8 @@
 
     <!-- Drop Zone -->
     <div class="drop-zone" id="drop-zone">
-      <input type="file" id="fileToUpload" name="fileToUpload" accept=".pdf,application/pdf" style="display:none;" required>
+      <input type="file" id="fileToUpload" name="fileToUpload" accept=".pdf,application/pdf" style="display:none;"
+        required>
 
       <!-- Default State -->
       <div class="drop-zone-content" id="drop-zone-content">
@@ -117,18 +121,18 @@
     }
 
     // ── DOM refs ───────────────────────────────────────────────────────────
-    const dropZone       = document.getElementById("drop-zone");
-    const fileInput      = document.getElementById("fileToUpload");
-    const dropContent    = document.getElementById("drop-zone-content");
-    const fileInfo       = document.getElementById("file-selected-info");
-    const fileNameEl     = document.getElementById("selected-file-name");
-    const fileSizeEl     = document.getElementById("selected-file-size");
-    const removeBtn      = document.getElementById("remove-file-btn");
-    const uploadBtn      = document.getElementById("upload-btn");
-    const progressWrap   = document.getElementById("progress-wrapper");
-    const progressFill   = document.getElementById("progress-bar-fill");
-    const progressLabel  = document.getElementById("progress-label");
-    let selectedFile     = null;
+    const dropZone = document.getElementById("drop-zone");
+    const fileInput = document.getElementById("fileToUpload");
+    const dropContent = document.getElementById("drop-zone-content");
+    const fileInfo = document.getElementById("file-selected-info");
+    const fileNameEl = document.getElementById("selected-file-name");
+    const fileSizeEl = document.getElementById("selected-file-size");
+    const removeBtn = document.getElementById("remove-file-btn");
+    const uploadBtn = document.getElementById("upload-btn");
+    const progressWrap = document.getElementById("progress-wrapper");
+    const progressFill = document.getElementById("progress-bar-fill");
+    const progressLabel = document.getElementById("progress-label");
+    let selectedFile = null;
 
     // ── File selection ─────────────────────────────────────────────────────
     function setFile(file) {
@@ -139,7 +143,7 @@
       fileNameEl.textContent = file.name;
       fileSizeEl.textContent = formatSize(file.size);
       dropContent.style.display = "none";
-      fileInfo.style.display    = "flex";
+      fileInfo.style.display = "flex";
       uploadBtn.disabled = false;
     }
 
@@ -147,7 +151,7 @@
       selectedFile = null;
       fileInput.value = "";
       dropContent.style.display = "flex";
-      fileInfo.style.display    = "none";
+      fileInfo.style.display = "none";
       uploadBtn.disabled = true;
     }
 
@@ -155,15 +159,15 @@
     dropZone.addEventListener("click", e => {
       if (!e.target.closest("#remove-file-btn")) fileInput.click();
     });
-    dropZone.addEventListener("dragover",  e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
-    dropZone.addEventListener("dragleave", ()  => dropZone.classList.remove("drag-over"));
-    dropZone.addEventListener("drop",      e => {
+    dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+    dropZone.addEventListener("drop", e => {
       e.preventDefault();
       dropZone.classList.remove("drag-over");
       if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
     });
     fileInput.addEventListener("change", () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
-    removeBtn.addEventListener("click",  e => { e.stopPropagation(); clearFile(); });
+    removeBtn.addEventListener("click", e => { e.stopPropagation(); clearFile(); });
 
     // ── Upload with XHR + progress ─────────────────────────────────────────
     uploadBtn.addEventListener("click", () => {
@@ -189,8 +193,9 @@
             progressFill.style.width = "100%";
             progressLabel.textContent = "✔ Processing complete! Redirecting…";
             sessionStorage.setItem("documentInfo", JSON.stringify({
-              filename:   data.filename,
-              size:       data.size,
+              documentId: data.documentId,
+              filename: data.filename,
+              size: data.size,
               uploadTime: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
             }));
             showToast("Document uploaded successfully!", "success");
@@ -218,11 +223,12 @@
       xhr.send(formData);
 
       progressWrap.style.display = "block";
-      progressFill.style.width   = "0%";
-      progressLabel.textContent  = "Uploading… 0%";
+      progressFill.style.width = "0%";
+      progressLabel.textContent = "Uploading… 0%";
       uploadBtn.disabled = true;
     });
   </script>
 
 </body>
+
 </html>

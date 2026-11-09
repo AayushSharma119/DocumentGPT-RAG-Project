@@ -38,12 +38,12 @@ public class DocumentController {
         }
 
         try {
-            documentService.loadDocument(document.getResource());
+            String documentId = documentService.loadDocument(document.getResource());
             return ResponseEntity.ok(Map.of(
                     "success", true,
+                    "documentId", documentId,
                     "filename", Objects.requireNonNullElse(document.getOriginalFilename(), "document.pdf"),
-                    "size", document.getSize()
-            ));
+                    "size", document.getSize()));
         } catch (RuntimeException e) {
             return ResponseEntity.internalServerError()
                     .body(Map.of("success", false, "error", "Failed to process document: " + e.getMessage()));
