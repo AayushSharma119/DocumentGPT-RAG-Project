@@ -47,7 +47,17 @@ class DocumentService {
             var pdfReader = new PagePdfDocumentReader(
                     resource, PdfDocumentReaderConfig.defaultConfig());
 
-            var tokens = tokenSplitter.split(pdfReader.read());
+            var pages = pdfReader.read();
+
+            if (pages.isEmpty()) {
+                throw new IllegalArgumentException("PDF contains no readable pages.");
+            }
+
+            var tokens = tokenSplitter.split(pages);
+
+            if (tokens.isEmpty()) {
+                throw new IllegalArgumentException("PDF contains no extractable text.");
+            }
 
             if (tokens.isEmpty()) {
                 throw new IllegalStateException("No tokens were extracted from the PDF.");
@@ -60,9 +70,11 @@ class DocumentService {
             log.info("Document uploaded. ID: {}, chunks: {}", documentId, tokens.size());
             return documentId;
 
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to load document", e);
-            throw new RuntimeException("Failed to load document: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to process document.", e);
         }
     }
 

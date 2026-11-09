@@ -27,14 +27,33 @@ public class DocumentController {
     public ResponseEntity<Map<String, Object>> uploadDocument(
             @RequestParam("fileToUpload") MultipartFile document) {
 
-        String contentType = document.getContentType();
-        if (contentType == null || !contentType.equalsIgnoreCase("application/pdf")) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("success", false, "error", "Only PDF files are accepted."));
-        }
         if (document.isEmpty()) {
             return ResponseEntity.badRequest()
                     .body(Map.of("success", false, "error", "Uploaded file is empty."));
+        }
+
+        if (document.getSize() > 10 * 1024 * 1024) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("success", false, "error", "File exceeds 10 MB limit."));
+        }
+
+        String filename = document.getOriginalFilename();
+
+        if (filename == null || !filename.toLowerCase().endsWith(".pdf")) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("success", false, "error", "Only PDF files are accepted."));
+        }
+
+        try (var inputStream = document.getInputStream()) {
+            byte[] header = inputStream.readNBytes(5);
+
+            if (!new String(header, java.nio.charset.StandardCharsets.US_ASCII).equals("%PDF-")) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("success", false, "error", "Invalid PDF file."));
+            }
+        } catch (java.io.IOException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("success", false, "error", "Unable to read uploaded file."));
         }
 
         try {
@@ -44,9 +63,12 @@ public class DocumentController {
                     "documentId", documentId,
                     "filename", Objects.requireNonNullElse(document.getOriginalFilename(), "document.pdf"),
                     "size", document.getSize()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("success", false, "error", e.getMessage()));
         } catch (RuntimeException e) {
             return ResponseEntity.internalServerError()
-                    .body(Map.of("success", false, "error", "Failed to process document: " + e.getMessage()));
+                    .body(Map.of("success", false, "error", "Failed to process document."));
         }
     }
 
