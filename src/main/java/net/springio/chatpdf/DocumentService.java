@@ -69,12 +69,13 @@ class DocumentService {
     }
 
     Flux<String> streamQuestion(String question, String conversationId, String documentId) {
-    String filter = "documentId == '" + UUID.fromString(documentId) + "'";
+        String filter = "documentId == '" + UUID.fromString(documentId) + "'";
 
-    return chatClient.prompt()
-            .advisors(new MessageChatMemoryAdvisor(chatMemory, conversationId, 20))
-            .advisors(a -> a.param(QuestionAnswerAdvisor.FILTER_EXPRESSION, filter))
-            .user(question)
-            .stream()
-            .content();
+        return chatClient.prompt()
+                .advisors(new MessageChatMemoryAdvisor(chatMemory, conversationId, 20))
+                .advisors(a -> a.param(QuestionAnswerAdvisor.FILTER_EXPRESSION, filter))
+                .user(question)
+                .stream()
+                .content();
+    }
 }
