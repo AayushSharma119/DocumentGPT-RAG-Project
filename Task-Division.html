@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DocumentGPT — Project Task Division</title>
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #f0f4f0;
+      color: #1a2e1a;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ── Page Wrapper ── */
+    .page {
+      max-width: 900px;
+      margin: 40px auto;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.10);
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #1a3d1a 0%, #2e6b30 100%);
+      color: #fff;
+      padding: 36px 40px 28px;
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .logo-badge {
+      width: 48px; height: 48px;
+      background: rgba(255,255,255,0.18);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+    }
+    .header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .header .subtitle {
+      font-size: 13px;
+      opacity: 0.75;
+      margin-top: 2px;
+    }
+    .team-chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+    .chip {
+      background: rgba(255,255,255,0.18);
+      border: 1px solid rgba(255,255,255,0.28);
+      border-radius: 99px;
+      padding: 4px 14px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* ── Body Padding ── */
+    .body { padding: 32px 40px 40px; }
+
+    /* ── Note Box ── */
+    .note-box {
+      background: #f0f7f0;
+      border-left: 4px solid #4caf50;
+      border-radius: 6px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #2e6b30;
+      margin-bottom: 28px;
+    }
+
+    /* ── Summary Table ── */
+    .summary-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      color: #1a2e1a;
+    }
+    table.summary {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 36px;
+      font-size: 13px;
+    }
+    table.summary th {
+      background: #1a3d1a;
+      color: #fff;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+    }
+    table.summary th:first-child { border-radius: 6px 0 0 0; }
+    table.summary th:last-child  { border-radius: 0 6px 0 0; }
+    table.summary td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #e8f0e8;
+      vertical-align: middle;
+    }
+    table.summary tr:last-child td { border-bottom: none; }
+    table.summary tr:nth-child(even) td { background: #f8fbf8; }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .badge-red    { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+    .badge-orange { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+    .badge-green  { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+
+    /* ── LOC Bar Chart ── */
+    .loc-section { margin-bottom: 36px; }
+    .loc-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .loc-name  { width: 90px; font-weight: 600; font-size: 13px; }
+    .loc-bar-wrap { flex: 1; background: #e8f0e8; border-radius: 99px; height: 22px; overflow: hidden; }
+    .loc-bar {
+      height: 100%;
+      border-radius: 99px;
+      display: flex;
+      align-items: center;
+      padding-left: 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      transition: width 0.6s ease;
+    }
+    .loc-num { font-size: 12px; font-weight: 600; color: #4a6b4a; width: 70px; text-align: right; }
+
+    /* ── Member Cards ── */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 36px;
+    }
+    .card {
+      border: 1px solid #dde8dd;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .avatar {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      font-size: 16px;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      color: #fff;
+    }
+    .card-name  { font-size: 15px; font-weight: 700; }
+    .card-area  { font-size: 11px; opacity: 0.75; margin-top: 1px; }
+    .card-body  { padding: 14px 16px; border-top: 1px solid #eef2ee; background: #fafcfa; }
+    .card-body h4 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6a9b6c; margin-bottom: 8px; }
+    .file-tag {
+      display: inline-block;
+      background: #e8f0e8;
+      border: 1px solid #c8dcc8;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 11px;
+      color: #2e5c2e;
+      margin: 2px 2px 2px 0;
+    }
+    .responsibilities { margin-top: 12px; }
+    .responsibilities h4 { margin-bottom: 6px; }
+    .responsibilities ul { padding-left: 16px; }
+    .responsibilities li { font-size: 12px; color: #3a5a3a; margin-bottom: 4px; }
+
+    /* ── Colour scheme per member ── */
+    .aayush-hdr    { background: linear-gradient(135deg,#1b5e20,#2e7d32); }
+    .aayush-av     { background: #2e7d32; }
+    .aayush-bar    { background: linear-gradient(90deg,#2e7d32,#66bb6a); }
+    .shubham-hdr   { background: linear-gradient(135deg,#0d47a1,#1565c0); }
+    .shubham-av    { background: #1565c0; }
+    .shubham-bar   { background: linear-gradient(90deg,#1565c0,#42a5f5); }
+    .soumya-hdr    { background: linear-gradient(135deg,#4a148c,#6a1b9a); }
+    .soumya-av     { background: #6a1b9a; }
+    .soumya-bar    { background: linear-gradient(90deg,#6a1b9a,#ba68c8); }
+    .prisha-hdr    { background: linear-gradient(135deg,#b71c1c,#c62828); }
+    .prisha-av     { background: #c62828; }
+    .prisha-bar    { background: linear-gradient(90deg,#c62828,#ef9a9a); }
+
+    /* ── Key Concepts ── */
+    .concepts { margin-top: 10px; }
+    .concepts h4 { margin-bottom: 6px; }
+    .concept-tag {
+      display: inline-block;
+      background: #fff3e0;
+      border: 1px solid #ffcc80;
+      border-radius: 99px;
+      padding: 2px 9px;
+      font-size: 11px;
+      color: #e65100;
+      margin: 2px 2px 2px 0;
+    }
+
+    /* ── Takeaway Box ── */
+    .takeaway {
+      background: #f0f7f0;
+      border: 1px solid #c8dcc8;
+      border-radius: 8px;
+      padding: 16px 20px;
+      font-size: 13px;
+      color: #2e5c2e;
+    }
+    .takeaway strong { color: #1a3d1a; }
+
+    /* ── Footer ── */
+    .footer {
+      background: #1a3d1a;
+      color: rgba(255,255,255,0.6);
+      text-align: center;
+      padding: 14px;
+      font-size: 12px;
+    }
+    .footer span { color: #81c784; font-weight: 600; }
+
+    /* ── Print ── */
+    @media print {
+      body { background: #fff; }
+      .page { box-shadow: none; margin: 0; border-radius: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- ── HEADER ── -->
+  <div class="header">
+    <div class="header-top">
+      <div class="logo-badge">🤖</div>
+      <div>
+        <h1>DocumentGPT Spring AI — Project Task Division</h1>
+        <div class="subtitle">Backend &amp; Infrastructure work only &nbsp;·&nbsp; Frontend excluded</div>
+      </div>
+    </div>
+    <div class="team-chips">
+      <span class="chip">👤 Aayush</span>
+      <span class="chip">👤 Shubham</span>
+      <span class="chip">👤 Soumyadeep</span>
+      <span class="chip">👤 Prisha</span>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- ── NOTE ── -->
+    <div class="note-box">
+      ℹ️&nbsp; All tasks are backend, infrastructure, configuration, and documentation work.
+      HTML templates, CSS, and JavaScript files are excluded from all assignments.
+      Prisha has been assigned conceptually easier infrastructure &amp; documentation work.
+    </div>
+
+    <!-- ── SUMMARY TABLE ── -->
+    <div class="summary-title">📋 Summary</div>
+    <table class="summary">
+      <thead>
+        <tr>
+          <th>Team Member</th>
+          <th>Area of Work</th>
+          <th>Difficulty</th>
+          <th>Lines of Code</th>
+          <th>Files Owned</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Aayush</strong></td>
+          <td>Core RAG Pipeline &amp; AI Service Layer</td>
+          <td><span class="badge badge-red">🔴 High</span></td>
+          <td><strong>83</strong></td>
+          <td>2 Java files</td>
+        </tr>
+        <tr>
+          <td><strong>Shubham</strong></td>
+          <td>WebSocket &amp; Real-Time Streaming Layer</td>
+          <td><span class="badge badge-red">🔴 High</span></td>
+          <td><strong>81</strong></td>
+          <td>1 Java file</td>
+        </tr>
+        <tr>
+          <td><strong>Soumyadeep</strong></td>
+          <td>REST API &amp; Application Architecture</td>
+          <td><span class="badge badge-orange">🟡 Medium-High</span></td>
+          <td><strong>166</strong></td>
+          <td>3 files (incl. pom.xml)</td>
+        </tr>
+        <tr>
+          <td><strong>Prisha</strong></td>
+          <td>Infrastructure, Configuration &amp; Documentation</td>
+          <td><span class="badge badge-green">🟢 Easier</span></td>
+          <td><strong>217</strong></td>
+          <td>8 files (incl. README)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ── LOC CHART ── -->
+    <div class="loc-section">
+      <div class="summary-title">📊 Lines of Code Comparison</div>
+
+      <div class="loc-row">
+        <span class="loc-name">Prisha</span>
+        <div class="loc-bar-wrap">
+          <div class="loc-bar prisha-bar" style="width:100%">217 lines</div>
+        </div>
+        <span class="loc-num">217 lines</span>
+      </div>
+      <div class="loc-row">
+        <span class="loc-name">Soumyadeep</span>
+        <div class="loc-bar-wrap">
+          <div class="loc-bar soumya-bar" style="width:76.5%">166 lines</div>
+        </div>
+        <span class="loc-num">166 lines</span>
+      </div>
+      <div class="loc-row">
+        <span class="loc-name">Aayush</span>
+        <div class="loc-bar-wrap">
+          <div class="loc-bar aayush-bar" style="width:38.2%">83 lines</div>
+        </div>
+        <span class="loc-num">83 lines</span>
+      </div>
+      <div class="loc-row">
+        <span class="loc-name">Shubham</span>
+        <div class="loc-bar-wrap">
+          <div class="loc-bar shubham-bar" style="width:37.3%">81 lines</div>
+        </div>
+        <span class="loc-num">81 lines</span>
+      </div>
+    </div>
+
+    <!-- ── MEMBER CARDS ── -->
+    <div class="summary-title">👥 Detailed Assignment Per Member</div>
+    <div class="cards-grid">
+
+      <!-- AAYUSH -->
+      <div class="card">
+        <div class="card-header aayush-hdr">
+          <div class="avatar aayush-av">A</div>
+          <div>
+            <div class="card-name" style="color:#fff">Aayush</div>
+            <div class="card-area" style="color:rgba(255,255,255,0.8)">Core RAG Pipeline &amp; AI Service</div>
+          </div>
+          <span class="badge badge-red" style="margin-left:auto">🔴 High</span>
+        </div>
+        <div class="card-body">
+          <h4>📁 Files</h4>
+          <span class="file-tag">DocumentService.java</span>
+          <span class="file-tag">AppConfig.java</span>
+          <div class="responsibilities">
+            <h4>✅ Responsibilities</h4>
+            <ul>
+              <li>PDF ingestion using <code>PagePdfDocumentReader</code></li>
+              <li>Tokenization via <code>TokenTextSplitter</code></li>
+              <li>Writing embedded chunks to pgvector store</li>
+              <li>RAG Q&amp;A flow with <code>QuestionAnswerAdvisor</code></li>
+              <li>Streaming with reactive <code>Flux&lt;String&gt;</code></li>
+              <li>ChatClient beans for <code>openai</code> &amp; <code>ollama</code> profiles</li>
+            </ul>
+          </div>
+          <div class="concepts">
+            <h4>💡 Key Concepts</h4>
+            <span class="concept-tag">Spring AI</span>
+            <span class="concept-tag">RAG Pattern</span>
+            <span class="concept-tag">Flux&lt;String&gt;</span>
+            <span class="concept-tag">@Profile</span>
+            <span class="concept-tag">pgvector</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SHUBHAM -->
+      <div class="card">
+        <div class="card-header shubham-hdr">
+          <div class="avatar shubham-av">S</div>
+          <div>
+            <div class="card-name" style="color:#fff">Shubham</div>
+            <div class="card-area" style="color:rgba(255,255,255,0.8)">WebSocket &amp; Real-Time Streaming</div>
+          </div>
+          <span class="badge badge-red" style="margin-left:auto">🔴 High</span>
+        </div>
+        <div class="card-body">
+          <h4>📁 Files</h4>
+          <span class="file-tag">WebSocketConfig.java</span>
+          <div class="responsibilities">
+            <h4>✅ Responsibilities</h4>
+            <ul>
+              <li>WebSocket handler at <code>/ws-chat</code> endpoint</li>
+              <li>Forwarding Flux tokens to browser in real-time</li>
+              <li>Session registry with <code>ConcurrentHashMap</code></li>
+              <li>Stop/cancel streaming via <code>[STOP]</code> command</li>
+              <li>Disposing reactive <code>Disposable</code> subscriptions</li>
+              <li>Thread-safe sends with <code>synchronized(session)</code></li>
+              <li>Cleanup on disconnect via <code>afterConnectionClosed()</code></li>
+            </ul>
+          </div>
+          <div class="concepts">
+            <h4>💡 Key Concepts</h4>
+            <span class="concept-tag">Spring WebSocket</span>
+            <span class="concept-tag">Disposable</span>
+            <span class="concept-tag">ConcurrentHashMap</span>
+            <span class="concept-tag">Thread Safety</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SOUMYADEEP -->
+      <div class="card">
+        <div class="card-header soumya-hdr">
+          <div class="avatar soumya-av">S</div>
+          <div>
+            <div class="card-name" style="color:#fff">Soumyadeep</div>
+            <div class="card-area" style="color:rgba(255,255,255,0.8)">REST API &amp; Application Architecture</div>
+          </div>
+          <span class="badge badge-orange" style="margin-left:auto">🟡 Med-High</span>
+        </div>
+        <div class="card-body">
+          <h4>📁 Files</h4>
+          <span class="file-tag">DocumentController.java</span>
+          <span class="file-tag">ChatpdfSpringAiApplication.java</span>
+          <span class="file-tag">pom.xml</span>
+          <div class="responsibilities">
+            <h4>✅ Responsibilities</h4>
+            <ul>
+              <li>Spring Boot application entry point</li>
+              <li>File upload endpoint (<code>POST /upload</code>) with JSON response</li>
+              <li>PDF MIME type validation (<code>application/pdf</code>)</li>
+              <li>Page routing (<code>GET /</code> and <code>GET /chat</code>)</li>
+              <li>Error handling (HTTP 400 / 500 with JSON)</li>
+              <li>Maven dependency &amp; Spring AI BOM management</li>
+            </ul>
+          </div>
+          <div class="concepts">
+            <h4>💡 Key Concepts</h4>
+            <span class="concept-tag">Spring MVC</span>
+            <span class="concept-tag">ResponseEntity</span>
+            <span class="concept-tag">MultipartFile</span>
+            <span class="concept-tag">Maven BOM</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRISHA -->
+      <div class="card">
+        <div class="card-header prisha-hdr">
+          <div class="avatar prisha-av">P</div>
+          <div>
+            <div class="card-name" style="color:#fff">Prisha</div>
+            <div class="card-area" style="color:rgba(255,255,255,0.8)">Infrastructure, Config &amp; Documentation</div>
+          </div>
+          <span class="badge badge-green" style="margin-left:auto">🟢 Easier</span>
+        </div>
+        <div class="card-body">
+          <h4>📁 Files</h4>
+          <span class="file-tag">compose.yaml</span>
+          <span class="file-tag">compose-ollama.yaml</span>
+          <span class="file-tag">init-script.sql</span>
+          <span class="file-tag">application.properties</span>
+          <span class="file-tag">application-ollama.properties</span>
+          <span class="file-tag">application-openai.properties</span>
+          <span class="file-tag">ApplicationTests.java</span>
+          <span class="file-tag">README.MD</span>
+          <div class="responsibilities">
+            <h4>✅ Responsibilities</h4>
+            <ul>
+              <li>Docker Compose setup for PostgreSQL + pgvector</li>
+              <li>Docker Compose setup for Ollama container</li>
+              <li>SQL init: create DB, user, enable vector extension</li>
+              <li>Base Spring config (datasource, pgvector, file size)</li>
+              <li>Ollama profile config (model selection)</li>
+              <li>OpenAI profile config (API key via env variable)</li>
+              <li>Context load test class &amp; full project README</li>
+            </ul>
+          </div>
+          <div class="concepts">
+            <h4>💡 Key Concepts</h4>
+            <span class="concept-tag">Docker Compose</span>
+            <span class="concept-tag">pgvector</span>
+            <span class="concept-tag">Spring Profiles</span>
+            <span class="concept-tag">@SpringBootTest</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /cards-grid -->
+
+    <!-- ── TAKEAWAY ── -->
+    <div class="takeaway">
+      ⚠️&nbsp; <strong>Note on Lines of Code vs. Effort:</strong>
+      By pure line count, Prisha has the most lines (217) — mostly from the README (130 lines) and YAML configs.
+      However, Aayush and Shubham's ~80 lines each are far more complex — reactive streaming, Spring AI RAG
+      pipelines, and concurrent session management are significantly harder to write and debug than configuration files.
+      <strong>Complexity-wise, Aayush and Shubham carry the heaviest technical burden.</strong>
+    </div>
+
+  </div><!-- /body -->
+
+  <!-- ── FOOTER ── -->
+  <div class="footer">
+    DocumentGPT Spring AI &nbsp;·&nbsp; Group Project &nbsp;·&nbsp;
+    Team: <span>Aayush, Shubham, Soumyadeep, Prisha</span>
+  </div>
+
+</div><!-- /page -->
+
+</body>
+</html>
+
