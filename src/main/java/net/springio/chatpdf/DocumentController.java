@@ -4,7 +4,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
+import java.security.Principal;
 import java.util.Map;
 import java.util.Objects;
 
@@ -25,7 +25,7 @@ public class DocumentController {
     @PostMapping("/upload")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> uploadDocument(
-            @RequestParam("fileToUpload") MultipartFile document) {
+            @RequestParam("fileToUpload") MultipartFile document, Principal principal) {
 
         if (document.isEmpty()) {
             return ResponseEntity.badRequest()
@@ -58,6 +58,10 @@ public class DocumentController {
 
         try {
             String documentId = documentService.loadDocument(document.getResource());
+            documentService.saveDocument(
+                    documentId,
+                    documentService.getUserId(principal.getName()),
+                    filename);
             String conversationId = documentService.createConversation(
                     documentId,
                     Objects.requireNonNullElse(document.getOriginalFilename(), "document.pdf"));

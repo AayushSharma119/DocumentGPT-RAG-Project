@@ -146,11 +146,46 @@ class DocumentService {
         return deletedChunks;
     }
 
+    void initializeChatTables() {
+        ensureChatTables();
+    }
+
+    public UUID getUserId(String username) {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM app_users WHERE username = ?",
+                UUID.class,
+                username);
+    }
+
+    public void saveDocument(String documentId, UUID userId, String filename) {
+        jdbcTemplate.update(
+                "INSERT INTO documents (id, user_id, filename) VALUES (?, ?, ?)",
+                UUID.fromString(documentId),
+                userId,
+                filename);
+    }
+
     private synchronized void ensureChatTables() {
         if (chatTablesInitialized) {
             return;
         }
-
+        jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS app_users (
+                        id UUID PRIMARY KEY,
+                        username VARCHAR(100) UNIQUE NOT NULL,
+                        email VARCHAR(255) UNIQUE NOT NULL,
+                        password VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """);
+        jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS documents (
+                        id UUID PRIMARY KEY,
+                        user_id UUID NOT NULL REFERENCES app_users(id),
+                        filename VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """);
         jdbcTemplate.execute("""
                     CREATE TABLE IF NOT EXISTS chat_conversations (
                         id UUID PRIMARY KEY,
@@ -160,7 +195,10 @@ class DocumentService {
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """);
-
+        jdbcTemplate.execute("""
+                    ALTER TABLE chat_conversations
+                    ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES app_users(id)
+                """);
         jdbcTemplate.execute("""
                     CREATE TABLE IF NOT EXISTS chat_messages (
                         id BIGSERIAL PRIMARY KEY,
@@ -254,7 +292,7 @@ class DocumentService {
     }
 
     void restoreConversationMemory(String conversationId) {
-        if (!chatMemory.get(conversationId).isEmpty()) {
+        if (!chatMemory.get(conversationId, 1).isEmpty()) {
             return;
         }
 

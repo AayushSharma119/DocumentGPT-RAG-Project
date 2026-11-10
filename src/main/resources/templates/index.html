@@ -8,6 +8,8 @@
   <link rel="stylesheet"
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="_csrf" th:content="${_csrf.token}">
+  <meta name="_csrf_header" th:content="${_csrf.headerName}">
   <script>
     // Apply saved theme before render to prevent flash
     (function () {
@@ -224,6 +226,12 @@
 
       xhr.open("POST", "/upload");
       xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+
+      const csrfToken = document.querySelector('meta[name="_csrf"]').content;
+      const csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+
+      xhr.setRequestHeader(csrfHeader, csrfToken);
+
       xhr.send(formData);
 
       progressWrap.style.display = "block";
