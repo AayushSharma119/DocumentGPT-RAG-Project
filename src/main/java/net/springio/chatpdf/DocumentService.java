@@ -12,7 +12,7 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
-import org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor;
+import org.springframework.ai.vectorstore.SearchRequest;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.List;
@@ -96,26 +96,83 @@ class DocumentService {
                 .add(conversationId);
     }
 
-    String askQuestion(String question, String conversationId, String documentId) {
+    private List<org.springframework.ai.document.Document> retrieveDocuments(
+            String question, String documentId) {
+
         String filter = "documentId == '" + UUID.fromString(documentId) + "'";
 
-        return chatClient.prompt()
-                .advisors(new MessageChatMemoryAdvisor(chatMemory, conversationId, 20))
-                .advisors(a -> a.param(QuestionAnswerAdvisor.FILTER_EXPRESSION, filter))
-                .user(question)
-                .call()
-                .content();
+        long startTime = System.nanoTime();
+
+        List<org.springframework.ai.document.Document> documents = vectorStore.similaritySearch(
+                SearchRequest.defaults()
+                        .withQuery(question)
+                        .withTopK(8)
+                        .withFilterExpression(filter));
+
+        long retrievalLatency = (System.nanoTime() - startTime) / 1_000_000;
+
+        log.info("RETRIEVAL LATENCY: {} ms | Retrieved chunks: {}",
+                retrievalLatency, documents.size());
+
+        return documents;
     }
 
-    Flux<String> streamQuestion(String question, String conversationId, String documentId) {
-        String filter = "documentId == '" + UUID.fromString(documentId) + "'";
+    private String buildContext(
+            List<org.springframework.ai.document.Document> documents) {
 
-        return chatClient.prompt()
+        if (documents == null || documents.isEmpty()) {
+            return "No relevant document context was found.";
+        }
+
+        return documents.stream()
+                .map(org.springframework.ai.document.Document::getContent)
+                .collect(java.util.stream.Collectors.joining("\n\n"));
+    }
+
+    String askQuestion(String question, String conversationId, String documentId) {
+
+        var documents = retrieveDocuments(question, documentId);
+        String context = buildContext(documents);
+
+        long generationStart = System.nanoTime();
+
+        String response = chatClient.prompt()
                 .advisors(new MessageChatMemoryAdvisor(chatMemory, conversationId, 20))
-                .advisors(a -> a.param(QuestionAnswerAdvisor.FILTER_EXPRESSION, filter))
-                .user(question)
-                .stream()
+                .user("DOCUMENT CONTEXT:\n" + context
+                        + "\n\nUSER QUESTION:\n" + question)
+                .call()
                 .content();
+
+        long generationLatency = (System.nanoTime() - generationStart) / 1_000_000;
+
+        log.info("GENERATION LATENCY: {} ms", generationLatency);
+
+        return response;
+    }
+
+    Flux<String> streamQuestion(
+            String question, String conversationId, String documentId) {
+
+        return Flux.defer(() -> {
+
+            var documents = retrieveDocuments(question, documentId);
+            String context = buildContext(documents);
+
+            long generationStart = System.nanoTime();
+
+            return chatClient.prompt()
+                    .advisors(new MessageChatMemoryAdvisor(chatMemory, conversationId, 20))
+                    .user("DOCUMENT CONTEXT:\n" + context
+                            + "\n\nUSER QUESTION:\n" + question)
+                    .stream()
+                    .content()
+                    .doFinally(signal -> {
+                        long generationLatency = (System.nanoTime() - generationStart) / 1_000_000;
+
+                        log.info("GENERATION LATENCY: {} ms | Stream status: {}",
+                                generationLatency, signal);
+                    });
+        });
     }
 
     int deleteDocument(String documentId, UUID userId) {

@@ -79,6 +79,8 @@ class WebSocketConfig implements WebSocketConfigurer {
                     return;
                 }
 
+                long totalStartTime = System.nanoTime();
+
                 try {
                     UUID.fromString(request.conversationId());
 
@@ -118,18 +120,35 @@ class WebSocketConfig implements WebSocketConfigurer {
                                                 userId);
                                     }
                                 } finally {
+                                    long totalLatency = (System.nanoTime() - totalStartTime) / 1_000_000;
+
+                                    log.info("TOTAL RESPONSE LATENCY: {} ms", totalLatency);
+
                                     activeSubscriptions.remove(session.getId());
                                     sendSafe(session, "[DONE]");
                                 }
                             })
                             .doOnError(e -> {
+                                long totalLatency = (System.nanoTime() - totalStartTime) / 1_000_000;
+
+                                log.error("TOTAL RESPONSE LATENCY: {} ms | Status: ERROR",
+                                        totalLatency);
+
                                 activeSubscriptions.remove(session.getId());
+
                                 log.error("Streaming error for session {}: {}",
                                         session.getId(), e.getMessage());
+
                                 sendSafe(session, "[ERROR]:Failed to generate response.");
                             })
                             .doOnCancel(() -> {
+                                long totalLatency = (System.nanoTime() - totalStartTime) / 1_000_000;
+
+                                log.info("TOTAL RESPONSE LATENCY: {} ms | Status: CANCELLED",
+                                        totalLatency);
+
                                 activeSubscriptions.remove(session.getId());
+
                                 log.info("Stream cancelled for session: {}", session.getId());
                             })
                             .subscribe();
