@@ -1429,3 +1429,9 @@ body {
     font-size: 1.5rem;
   }
 }
+
+.upload-logout-form {
+  position: absolute;
+  top: 20px;
+  right: 70px;
+}
