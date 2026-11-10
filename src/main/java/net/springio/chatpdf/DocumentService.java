@@ -118,24 +118,42 @@ class DocumentService {
                 .content();
     }
 
-    int deleteDocument(String documentId) {
+    int deleteDocument(String documentId, UUID userId) {
         ensureChatTables();
+
         UUID documentUuid = UUID.fromString(documentId);
 
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM documents WHERE id = ? AND user_id = ?",
+                Integer.class,
+                documentUuid,
+                userId);
+
+        if (count == null || count == 0) {
+            throw new IllegalArgumentException("Document not found.");
+        }
+
         List<String> conversationIds = jdbcTemplate.queryForList(
-                "SELECT id::text FROM chat_conversations WHERE document_id = ?",
+                "SELECT id::text FROM chat_conversations WHERE document_id = ? AND user_id = ?",
                 String.class,
-                documentUuid);
+                documentUuid,
+                userId);
 
         conversationIds.forEach(chatMemory::clear);
 
         jdbcTemplate.update(
-                "DELETE FROM chat_conversations WHERE document_id = ?",
-                documentUuid);
+                "DELETE FROM chat_conversations WHERE document_id = ? AND user_id = ?",
+                documentUuid,
+                userId);
 
         int deletedChunks = jdbcTemplate.update(
                 "DELETE FROM documentgpt_vectors WHERE metadata ->> 'documentId' = ?",
                 documentId);
+
+        jdbcTemplate.update(
+                "DELETE FROM documents WHERE id = ? AND user_id = ?",
+                documentUuid,
+                userId);
 
         Set<String> conversations = documentConversations.remove(documentId);
 
@@ -213,109 +231,154 @@ class DocumentService {
         chatTablesInitialized = true;
     }
 
-    String createConversation(String documentId, String title) {
+    String createConversation(String documentId, String title, UUID userId) {
         ensureChatTables();
 
         UUID documentUuid = UUID.fromString(documentId);
         String conversationId = UUID.randomUUID().toString();
 
-        jdbcTemplate.update(
-                "INSERT INTO chat_conversations (id, document_id, title) VALUES (?, ?, ?)",
+        int inserted = jdbcTemplate.update("""
+                INSERT INTO chat_conversations (id, document_id, title, user_id)
+                SELECT ?, id, ?, user_id
+                FROM documents
+                WHERE id = ? AND user_id = ?
+                """,
                 UUID.fromString(conversationId),
+                title,
                 documentUuid,
-                title);
+                userId);
+
+        if (inserted != 1) {
+            throw new IllegalArgumentException(
+                    "Document not found or not owned by this user.");
+        }
 
         return conversationId;
     }
 
-    void saveMessage(String conversationId, String role, String content) {
+    void saveMessage(String conversationId, String role, String content, UUID userId) {
         ensureChatTables();
 
-        jdbcTemplate.update(
-                "INSERT INTO chat_messages (conversation_id, role, content) VALUES (?, ?, ?)",
-                UUID.fromString(conversationId),
+        int inserted = jdbcTemplate.update("""
+                INSERT INTO chat_messages (conversation_id, role, content)
+                SELECT id, ?, ?
+                FROM chat_conversations
+                WHERE id = ? AND user_id = ?
+                """,
                 role,
-                content);
+                content,
+                UUID.fromString(conversationId),
+                userId);
+
+        if (inserted != 1) {
+            throw new IllegalArgumentException("Conversation not found or not owned by this user.");
+        }
 
         jdbcTemplate.update(
-                "UPDATE chat_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                UUID.fromString(conversationId));
+                """
+                        UPDATE chat_conversations
+                        SET updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ? AND user_id = ?
+                        """,
+                UUID.fromString(conversationId),
+                userId);
     }
 
-    List<Map<String, Object>> getConversations() {
+    List<Map<String, Object>> getConversations(UUID userId) {
         ensureChatTables();
 
         return jdbcTemplate.queryForList("""
-                    SELECT id AS "conversationId",
-                           document_id AS "documentId",
-                           title,
-                           created_at AS "createdAt"
-                    FROM chat_conversations
-                    ORDER BY updated_at DESC
-                """);
+                SELECT id AS "conversationId",
+                       document_id AS "documentId",
+                       title,
+                       created_at AS "createdAt"
+                FROM chat_conversations
+                WHERE user_id = ?
+                ORDER BY updated_at DESC
+                """, userId);
     }
 
-    List<Map<String, Object>> getMessages(String conversationId) {
+    List<Map<String, Object>> getMessages(String conversationId, UUID userId) {
         ensureChatTables();
 
         return jdbcTemplate.queryForList("""
-                    SELECT role, content, created_at AS "createdAt"
-                    FROM chat_messages
-                    WHERE conversation_id = ?
-                    ORDER BY id ASC
-                """, UUID.fromString(conversationId));
+                SELECT m.role, m.content, m.created_at AS "createdAt"
+                FROM chat_messages m
+                JOIN chat_conversations c ON m.conversation_id = c.id
+                WHERE c.id = ? AND c.user_id = ?
+                ORDER BY m.id ASC
+                """,
+                UUID.fromString(conversationId),
+                userId);
     }
 
     boolean conversationBelongsToDocument(
-            String conversationId, String documentId) {
+            String conversationId, String documentId, UUID userId) {
+
         ensureChatTables();
 
         Integer count = jdbcTemplate.queryForObject("""
-                    SELECT COUNT(*) FROM chat_conversations
-                    WHERE id = ? AND document_id = ?
-                """, Integer.class,
+                SELECT COUNT(*)
+                FROM chat_conversations c
+                JOIN documents d ON c.document_id = d.id
+                WHERE c.id = ?
+                  AND c.document_id = ?
+                  AND c.user_id = ?
+                  AND d.user_id = ?
+                """,
+                Integer.class,
                 UUID.fromString(conversationId),
-                UUID.fromString(documentId));
+                UUID.fromString(documentId),
+                userId,
+                userId);
 
         return count != null && count > 0;
     }
 
-    void deleteConversation(String conversationId) {
+    void deleteConversation(String conversationId, UUID userId) {
         ensureChatTables();
 
         UUID id = UUID.fromString(conversationId);
 
-        jdbcTemplate.update(
-                "DELETE FROM chat_conversations WHERE id = ?", id);
+        int deleted = jdbcTemplate.update(
+                "DELETE FROM chat_conversations WHERE id = ? AND user_id = ?",
+                id,
+                userId);
+
+        if (deleted == 0) {
+            throw new IllegalArgumentException("Conversation not found.");
+        }
 
         chatMemory.clear(conversationId);
     }
 
-    void restoreConversationMemory(String conversationId) {
-        if (!chatMemory.get(conversationId, 1).isEmpty()) {
-            return;
-        }
+    void restoreConversationMemory(String conversationId, UUID userId) {
+        {
+            if (!chatMemory.get(conversationId, 1).isEmpty()) {
+                return;
+            }
 
-        List<Map<String, Object>> messages = getMessages(conversationId);
+            List<Map<String, Object>> messages = getMessages(conversationId, userId);
 
-        List<org.springframework.ai.chat.messages.Message> chatMessages = new java.util.ArrayList<>();
+            List<org.springframework.ai.chat.messages.Message> chatMessages = new java.util.ArrayList<>();
 
-        for (Map<String, Object> message : messages) {
-            String role = message.get("role").toString();
-            String content = message.get("content").toString();
+            for (Map<String, Object> message : messages) {
+                String role = message.get("role").toString();
+                String content = message.get("content").toString();
 
-            if ("user".equals(role)) {
-                chatMessages.add(
-                        new org.springframework.ai.chat.messages.UserMessage(content));
-            } else if ("assistant".equals(role)) {
-                chatMessages.add(
-                        new org.springframework.ai.chat.messages.AssistantMessage(content));
+                if ("user".equals(role)) {
+                    chatMessages.add(
+                            new org.springframework.ai.chat.messages.UserMessage(content));
+                } else if ("assistant".equals(role)) {
+                    chatMessages.add(
+                            new org.springframework.ai.chat.messages.AssistantMessage(content));
+                }
+            }
+
+            if (!chatMessages.isEmpty()) {
+                chatMemory.add(conversationId, chatMessages);
             }
         }
 
-        if (!chatMessages.isEmpty()) {
-            chatMemory.add(conversationId, chatMessages);
-        }
     }
-
 }

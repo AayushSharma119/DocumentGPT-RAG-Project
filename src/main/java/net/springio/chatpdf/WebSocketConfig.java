@@ -38,6 +38,13 @@ class WebSocketConfig implements WebSocketConfigurer {
             @Override
             public void handleTextMessage(WebSocketSession session, TextMessage message) {
                 String payload = message.getPayload();
+                if (session.getPrincipal() == null) {
+                    sendSafe(session, "[ERROR]:Authentication required.");
+                    return;
+                }
+
+                UUID userId = documentService.getUserId(
+                        session.getPrincipal().getName());
 
                 // Stop generating if client requested cancellation
                 if ("[STOP]".equalsIgnoreCase(payload.trim())) {
@@ -76,7 +83,9 @@ class WebSocketConfig implements WebSocketConfigurer {
                     UUID.fromString(request.conversationId());
 
                     if (!documentService.conversationBelongsToDocument(
-                            request.conversationId(), request.documentId())) {
+                            request.conversationId(),
+                            request.documentId(),
+                            userId)) {
                         sendSafe(session, "[ERROR]:Invalid conversation for this document.");
                         return;
                     }
@@ -85,9 +94,9 @@ class WebSocketConfig implements WebSocketConfigurer {
 
                     documentService.registerConversation(conversationId, request.documentId());
 
-                    documentService.restoreConversationMemory(conversationId);
+                    documentService.restoreConversationMemory(conversationId, userId);
 
-                    documentService.saveMessage(conversationId, "user", request.question());
+                    documentService.saveMessage(conversationId, "user", request.question(), userId);
 
                     StringBuilder assistantResponse = new StringBuilder();
 
@@ -105,7 +114,8 @@ class WebSocketConfig implements WebSocketConfigurer {
                                         documentService.saveMessage(
                                                 conversationId,
                                                 "assistant",
-                                                assistantResponse.toString());
+                                                assistantResponse.toString(),
+                                                userId);
                                     }
                                 } finally {
                                     activeSubscriptions.remove(session.getId());
@@ -139,7 +149,7 @@ class WebSocketConfig implements WebSocketConfigurer {
             public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
                 stopSessionStream(session.getId());
             }
-        }, "/ws-chat").setAllowedOrigins("*");
+        }, "/ws-chat");
     }
 
     private void stopSessionStream(String sessionId) {

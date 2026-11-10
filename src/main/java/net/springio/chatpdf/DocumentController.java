@@ -7,6 +7,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.security.Principal;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 @Controller
 public class DocumentController {
@@ -57,14 +58,16 @@ public class DocumentController {
         }
 
         try {
+            UUID userId = documentService.getUserId(principal.getName());
+
             String documentId = documentService.loadDocument(document.getResource());
-            documentService.saveDocument(
-                    documentId,
-                    documentService.getUserId(principal.getName()),
-                    filename);
+
+            documentService.saveDocument(documentId, userId, filename);
+
             String conversationId = documentService.createConversation(
                     documentId,
-                    Objects.requireNonNullElse(document.getOriginalFilename(), "document.pdf"));
+                    filename,
+                    userId);
             return ResponseEntity.ok(Map.of(
                     "success", true,
                     "documentId", documentId,
@@ -88,10 +91,12 @@ public class DocumentController {
     @DeleteMapping("/documents/{documentId}")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> deleteDocument(
-            @PathVariable String documentId) {
+            @PathVariable String documentId, Principal principal) {
 
         try {
-            int deletedChunks = documentService.deleteDocument(documentId);
+            UUID userId = documentService.getUserId(principal.getName());
+
+            int deletedChunks = documentService.deleteDocument(documentId, userId);
 
             return ResponseEntity.ok(Map.of(
                     "success", true,
@@ -109,18 +114,21 @@ public class DocumentController {
 
     @GetMapping("/conversations")
     @ResponseBody
-    public ResponseEntity<?> getConversations() {
-        return ResponseEntity.ok(documentService.getConversations());
+    public ResponseEntity<?> getConversations(Principal principal) {
+        UUID userId = documentService.getUserId(principal.getName());
+        return ResponseEntity.ok(documentService.getConversations(userId));
     }
 
     @GetMapping("/conversations/{conversationId}/messages")
     @ResponseBody
     public ResponseEntity<?> getConversationMessages(
-            @PathVariable String conversationId) {
+            @PathVariable String conversationId, Principal principal) {
 
         try {
+            UUID userId = documentService.getUserId(principal.getName());
+
             return ResponseEntity.ok(
-                    documentService.getMessages(conversationId));
+                    documentService.getMessages(conversationId, userId));
 
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest()
@@ -131,10 +139,12 @@ public class DocumentController {
     @DeleteMapping("/conversations/{conversationId}")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> deleteConversation(
-            @PathVariable String conversationId) {
+            @PathVariable String conversationId, Principal principal) {
 
         try {
-            documentService.deleteConversation(conversationId);
+            UUID userId = documentService.getUserId(principal.getName());
+
+            documentService.deleteConversation(conversationId, userId);
 
             return ResponseEntity.ok(Map.of(
                     "success", true,

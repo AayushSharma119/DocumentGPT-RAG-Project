@@ -1,53 +1,121 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DocumentGPT - Register</title>
+    <link rel="stylesheet" href="/css/style.css?v=3">
+    <link rel="stylesheet" href="/css/style.css?v=3">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded">
+
+    <script>
+        (function () {
+            if (localStorage.getItem("theme") === "light") {
+                document.documentElement.classList.add("light-mode");
+            }
+        })();
+    </script>
 </head>
 
 <body>
-    <h2>Create Account</h2>
 
-    <p id="message"></p>
+    <button class="icon-btn auth-theme-toggle" id="theme-toggle" title="Toggle theme">
+        <span class="material-symbols-rounded">light_mode</span>
+    </button>
 
-    <form id="registerForm" method="post" action="/register">
-        <input type="text" name="username" placeholder="Username" required>
-        <br><br>
+    <main class="auth-page">
+        <div class="auth-card">
 
-        <input type="email" name="email" placeholder="Email" required>
-        <br><br>
+            <img src="/images/spring-ai-logo.png" alt="DocumentGPT Logo" class="auth-logo">
 
-        <input type="password" name="password" placeholder="Password (minimum 8 characters)" minlength="8" required>
-        <br><br>
+            <h1 class="auth-title">Create Account</h1>
+            <p class="auth-subtitle">Join DocumentGPT and start chatting with your documents</p>
 
-        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <p id="message" class="auth-message"></p>
 
-        <button type="submit">Register</button>
-    </form>
+            <form id="registerForm" class="auth-form" method="post" action="/register">
 
-    <p>Already registered? <a href="/login">Login</a></p>
+                <input type="text" name="username" placeholder="Username" autocomplete="username" required>
+
+                <input type="email" name="email" placeholder="Email address" autocomplete="email" required>
+
+                <input type="password" name="password" placeholder="Password (minimum 8 characters)"
+                    autocomplete="new-password" minlength="8" required>
+
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+
+                <button type="submit" class="auth-submit-btn">
+                    Create Account
+                </button>
+
+            </form>
+
+            <p class="auth-footer">
+                Already have an account?
+                <a href="/login">Sign In</a>
+            </p>
+
+        </div>
+    </main>
 
     <script>
+        const themeToggle = document.getElementById("theme-toggle");
+
+        function applyTheme() {
+            themeToggle.querySelector(".material-symbols-rounded").textContent =
+                localStorage.getItem("theme") === "light" ? "dark_mode" : "light_mode";
+        }
+
+        themeToggle.addEventListener("click", () => {
+            document.body.classList.toggle("light-mode");
+
+            const theme = document.body.classList.contains("light-mode") ? "light" : "dark";
+            localStorage.setItem("theme", theme);
+            applyTheme();
+        });
+
+        if (localStorage.getItem("theme") === "light") {
+            document.body.classList.add("light-mode");
+        }
+
+        applyTheme();
+
         document.getElementById("registerForm").addEventListener("submit",
             async function (event) {
                 event.preventDefault();
 
-                const response = await fetch("/register", {
-                    method: "POST",
-                    body: new FormData(this)
-                });
-
-                const data = await response.json();
+                const button = this.querySelector("button[type='submit']");
                 const message = document.getElementById("message");
 
-                message.textContent = data.message || data.error;
-                message.style.color = data.success ? "green" : "red";
+                button.disabled = true;
+                button.textContent = "Creating Account...";
+                message.textContent = "";
 
-                if (data.success) {
-                    this.reset();
+                try {
+                    const response = await fetch("/register", {
+                        method: "POST",
+                        body: new FormData(this)
+                    });
+
+                    const data = await response.json();
+
+                    message.textContent = data.message || data.error;
+                    message.style.color = data.success ? "var(--accent)" : "var(--danger)";
+
+                    if (data.success) {
+                        this.reset();
+                    }
+                } catch (error) {
+                    message.textContent = "Something went wrong. Please try again.";
+                    message.style.color = "var(--danger)";
+                } finally {
+                    button.disabled = false;
+                    button.textContent = "Create Account";
                 }
             });
     </script>
+
 </body>
 
 </html>

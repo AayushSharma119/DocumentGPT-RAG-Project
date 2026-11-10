@@ -1,34 +1,89 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DocumentGPT - Login</title>
+    <link rel="stylesheet" href="/css/style.css?v=3">
+    <link rel="stylesheet" href="/css/style.css?v=3">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded">
+    <script>
+        (function () {
+            if (localStorage.getItem("theme") === "light") {
+                document.documentElement.classList.add("light-mode");
+            }
+        })();
+    </script>
 </head>
 
 <body>
-    <h2>DocumentGPT Login</h2>
 
-    <p th:if="${param.error}" style="color:red;">
-        Invalid username or password.
-    </p>
+    <button class="icon-btn auth-theme-toggle" id="theme-toggle" title="Toggle theme">
+        <span class="material-symbols-rounded">light_mode</span>
+    </button>
 
-    <p th:if="${param.logout}">
-        You have been logged out.
-    </p>
+    <main class="auth-page">
+        <div class="auth-card">
 
-    <form th:action="@{/login}" method="post">
-        <input type="text" name="username" placeholder="Username" required>
-        <br><br>
+            <img src="/images/spring-ai-logo.png" alt="DocumentGPT Logo" class="auth-logo">
 
-        <input type="password" name="password" placeholder="Password" required>
-        <br><br>
+            <h1 class="auth-title">Welcome Back</h1>
+            <p class="auth-subtitle">Sign in to continue to DocumentGPT</p>
 
-        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <p class="auth-message" th:if="${param.error}" style="color:var(--danger);">
+                Invalid username or password.
+            </p>
 
-        <button type="submit">Login</button>
-    </form>
+            <p class="auth-message" th:if="${param.logout}" style="color:var(--accent);">
+                You have been logged out successfully.
+            </p>
 
-    <p>Don't have an account? <a href="/register">Register</a></p>
+            <form class="auth-form" th:action="@{/login}" method="post">
+
+                <input type="text" name="username" placeholder="Username" autocomplete="username" required>
+
+                <input type="password" name="password" placeholder="Password" autocomplete="current-password" required>
+
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+
+                <button type="submit" class="auth-submit-btn">
+                    Sign In
+                </button>
+
+            </form>
+
+            <p class="auth-footer">
+                Don't have an account?
+                <a href="/register">Create Account</a>
+            </p>
+
+        </div>
+    </main>
+
+    <script>
+        const themeToggle = document.getElementById("theme-toggle");
+
+        function applyTheme() {
+            themeToggle.querySelector(".material-symbols-rounded").textContent =
+                localStorage.getItem("theme") === "light" ? "dark_mode" : "light_mode";
+        }
+
+        themeToggle.addEventListener("click", () => {
+            document.body.classList.toggle("light-mode");
+
+            const theme = document.body.classList.contains("light-mode") ? "light" : "dark";
+            localStorage.setItem("theme", theme);
+            applyTheme();
+        });
+
+        if (localStorage.getItem("theme") === "light") {
+            document.body.classList.add("light-mode");
+        }
+
+        applyTheme();
+    </script>
+
 </body>
 
 </html>

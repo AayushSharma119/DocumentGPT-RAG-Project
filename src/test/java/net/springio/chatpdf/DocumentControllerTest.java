@@ -57,35 +57,48 @@ class DocumentControllerTest {
                 MockMultipartFile file = new MockMultipartFile(
                                 "fileToUpload", "test.pdf", "application/pdf", pdfContent);
 
-                when(documentService.loadDocument(any()))
-                                .thenReturn("123e4567-e89b-12d3-a456-426614174000");
-                when(documentService.createConversation(
-                                "123e4567-e89b-12d3-a456-426614174000",
-                                "test.pdf"))
-                                .thenReturn("223e4567-e89b-12d3-a456-426614174000");
                 UUID userId = UUID.randomUUID();
 
                 when(documentService.getUserId("testuser"))
                                 .thenReturn(userId);
+
+                when(documentService.loadDocument(any()))
+                                .thenReturn("123e4567-e89b-12d3-a456-426614174000");
+
+                when(documentService.createConversation(
+                                "123e4567-e89b-12d3-a456-426614174000",
+                                "test.pdf",
+                                userId))
+                                .thenReturn("223e4567-e89b-12d3-a456-426614174000");
+
                 ResponseEntity<?> response = controller.uploadDocument(file, principal);
 
                 assertEquals(200, response.getStatusCode().value());
+
                 verify(documentService).loadDocument(any());
-                verify(documentService).createConversation(
-                                "123e4567-e89b-12d3-a456-426614174000",
-                                "test.pdf");
+
                 verify(documentService).saveDocument(
                                 "123e4567-e89b-12d3-a456-426614174000",
                                 userId,
                                 "test.pdf");
+
+                verify(documentService).createConversation(
+                                "123e4567-e89b-12d3-a456-426614174000",
+                                "test.pdf",
+                                userId);
         }
 
         @Test
         void shouldRejectInvalidDocumentIdDuringDeletion() {
-                when(documentService.deleteDocument("invalid-id"))
+                UUID userId = UUID.randomUUID();
+
+                when(documentService.getUserId("testuser"))
+                                .thenReturn(userId);
+
+                when(documentService.deleteDocument("invalid-id", userId))
                                 .thenThrow(new IllegalArgumentException());
 
-                ResponseEntity<?> response = controller.deleteDocument("invalid-id");
+                ResponseEntity<?> response = controller.deleteDocument("invalid-id", principal);
 
                 assertEquals(400, response.getStatusCode().value());
         }

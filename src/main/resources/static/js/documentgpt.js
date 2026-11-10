@@ -36,6 +36,14 @@ const sidebarCollapseBtn = document.getElementById("sidebar-collapse-btn");
 const sidebarToggleDesk = document.getElementById("sidebar-toggle-desktop");
 const toastContainer = document.getElementById("toast-container");
 
+// ── CSRF Protection ─────────────────────────────────────
+function getCsrfHeaders() {
+  const token = document.querySelector('meta[name="_csrf"]')?.content;
+  const header = document.querySelector('meta[name="_csrf_header"]')?.content;
+
+  return token && header ? { [header]: token } : {};
+}
+
 // ── State ─────────────────────────────────────────────────────────────────
 let userText = null;
 let isStreaming = false;
@@ -296,7 +304,10 @@ async function renderPreviousConversations() {
         try {
           const result = await fetch(
             `/conversations/${encodeURIComponent(conversation.conversationId)}`,
-            { method: "DELETE" }
+            {
+              method: "DELETE",
+              headers: getCsrfHeaders()
+            }
           );
 
           if (!result.ok) {
@@ -617,7 +628,10 @@ async function deleteChat() {
   try {
     const response = await fetch(
       `/conversations/${encodeURIComponent(info.conversationId)}`,
-      { method: "DELETE" }
+      {
+        method: "DELETE",
+        headers: getCsrfHeaders()
+      }
     );
 
     if (!response.ok) {
@@ -649,7 +663,8 @@ async function deleteDocument() {
 
   try {
     const response = await fetch(`/documents/${encodeURIComponent(info.documentId)}`, {
-      method: "DELETE"
+      method: "DELETE",
+      headers: getCsrfHeaders()
     });
 
     const data = await response.json();

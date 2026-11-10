@@ -23,6 +23,12 @@
   <!-- Toast Container -->
   <div class="toast-container" id="toast-container"></div>
 
+  <!-- Logout -->
+  <form th:action="@{/logout}" method="post" style="position:absolute; top:20px; right:70px;">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+    <button type="submit">Logout</button>
+  </form>
+
   <!-- Theme Toggle -->
   <button class="icon-btn theme-toggle-fixed" id="theme-toggle" title="Toggle theme">
     <span class="material-symbols-rounded">light_mode</span>
