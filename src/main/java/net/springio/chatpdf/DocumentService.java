@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 class DocumentService {
@@ -153,24 +154,58 @@ class DocumentService {
     Flux<String> streamQuestion(
             String question, String conversationId, String documentId) {
 
-        return Flux.defer(() -> {
+        return Flux.<String>defer(() -> {
 
             var documents = retrieveDocuments(question, documentId);
             String context = buildContext(documents);
 
             long generationStart = System.nanoTime();
+            AtomicLong generatedTokens = new AtomicLong(0);
 
             return chatClient.prompt()
                     .advisors(new MessageChatMemoryAdvisor(chatMemory, conversationId, 20))
                     .user("DOCUMENT CONTEXT:\n" + context
                             + "\n\nUSER QUESTION:\n" + question)
                     .stream()
-                    .content()
+                    .chatResponse()
+                    .doOnNext(response -> {
+                        if (response.getMetadata() != null
+                                && response.getMetadata().getUsage() != null
+                                && response.getMetadata().getUsage().getGenerationTokens() != null) {
+
+                            generatedTokens.set(
+                                    response.getMetadata().getUsage().getGenerationTokens());
+                        }
+                    })
+                    .<String>map(response -> {
+                        if (response.getResult() == null) {
+                            return "";
+                        }
+
+                        String content = response.getResult()
+                                .getOutput()
+                                .getContent();
+
+                        return content != null ? content : "";
+                    })
+                    .filter(chunk -> !chunk.isEmpty())
                     .doFinally(signal -> {
+
                         long generationLatency = (System.nanoTime() - generationStart) / 1_000_000;
+
+                        long tokens = generatedTokens.get();
+
+                        double tokensPerSecond = generationLatency > 0
+                                ? tokens / (generationLatency / 1000.0)
+                                : 0;
 
                         log.info("GENERATION LATENCY: {} ms | Stream status: {}",
                                 generationLatency, signal);
+
+                        log.info("GENERATED TOKENS: {}", tokens);
+
+                        log.info("GENERATION SPEED: {} tokens/sec",
+                                String.format("%.2f", tokensPerSecond));
                     });
         });
     }

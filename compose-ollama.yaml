@@ -1,8 +1,9 @@
+
 version: "3.8"
 
 services:
   postgres:
-    image: ankane/pgvector:latest # Prebuilt PostgreSQL image with pgvector
+    image: ankane/pgvector:latest
     container_name: postgres-pgvector
     restart: always
     environment:
@@ -23,6 +24,13 @@ services:
       - ollama-data:/root/.ollama
     ports:
       - "11434:11434"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
 volumes:
   pgvector-data:
