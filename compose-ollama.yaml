@@ -20,6 +20,8 @@ services:
     image: ollama/ollama:latest
     container_name: ollama
     restart: always
+    environment:
+      OLLAMA_NUM_PARALLEL: "3"
     volumes:
       - ollama-data:/root/.ollama
     ports:

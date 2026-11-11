@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import org.springframework.ai.embedding.EmbeddingModel;
 
 @Service
 class DocumentService {
@@ -28,6 +29,7 @@ class DocumentService {
 
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
+    private final EmbeddingModel embeddingModel;
     private final ChatMemory chatMemory;
     private final JdbcTemplate jdbcTemplate;
     private volatile boolean chatTablesInitialized = false;
@@ -35,14 +37,17 @@ class DocumentService {
     private final TokenTextSplitter tokenSplitter = new TokenTextSplitter();
 
     DocumentService(ChatClient chatClient, VectorStore vectorStore,
-            ChatMemory chatMemory, JdbcTemplate jdbcTemplate) {
+            ChatMemory chatMemory, JdbcTemplate jdbcTemplate,
+            EmbeddingModel embeddingModel) {
         this.chatClient = chatClient;
         this.vectorStore = vectorStore;
         this.chatMemory = chatMemory;
         this.jdbcTemplate = jdbcTemplate;
+        this.embeddingModel = embeddingModel;
     }
 
     String loadDocument(Resource resource) {
+        log.info("EMBEDDING MODEL: {}", embeddingModel.getClass().getName());
         try {
             String documentId = UUID.randomUUID().toString();
 
@@ -62,6 +67,8 @@ class DocumentService {
             }
 
             tokens.forEach(token -> token.getMetadata().put("documentId", documentId));
+            log.info("Embedding model implementation: {}", embeddingModel.getClass().getName());
+            log.info("Embedding model details: {}", embeddingModel);
 
             vectorStore.write(tokens);
 
